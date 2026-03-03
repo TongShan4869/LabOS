@@ -479,22 +479,12 @@ def print_summary(cfg, project=None, obsidian_ok=True):
    python3 {LAB_DIR}/skills/lab-init/lab_init.py --add-project
 """)
 
-# ── --add-project ──────────────────────────────────────────────────────────────
-def cmd_add_project():
-    cfg = load_json(LAB_CONFIG)
-    if not cfg:
-        print(red("❌ No LAB_CONFIG.json found. Run lab-init first."))
-        sys.exit(1)
-
-    print(f"\n{bold('── Add New Project ─────────────────────────')}")
-    project = collect_first_project()
-    if not project:
-        print("Cancelled.")
-        return
-
-    # Add to research graph
+# ── Shared project writer ──────────────────────────────────────────────────────
+def _write_project(cfg, project):
+    """Write a project to research-graph, LAB_MEMORY, and Obsidian. Shared by all paths."""
     slug = slugify(project["name"])
     hyps = [project["hypothesis"]] if project.get("hypothesis") else []
+
     append_jsonl(RESEARCH_GRAPH, {
         "type": "Project",
         "id": f"proj_{slug}",
@@ -510,16 +500,15 @@ def cmd_add_project():
     print(f"  {green('✓')} Added to research-graph.jsonl")
 
     # Update LAB_MEMORY.md
-    memory = LAB_MEMORY.read_text() if LAB_MEMORY.exists() else ""
-    new_entry = f"- **{project['name']}:** {project['description']} — Status: {project['status']}\n"
-    if "## Active Projects" in memory:
+    if LAB_MEMORY.exists():
+        memory = LAB_MEMORY.read_text()
+        new_entry = f"- **{project['name']}:** {project['description']} — Status: {project['status']}\n"
         memory = memory.replace(
-            "(none yet — add with: `python3 lab_init.py --add-project`)\n",
-            ""
+            "(none yet — add with: `python3 lab_init.py --add-project`)\n", ""
         )
         memory = memory.replace("## Active Projects\n", f"## Active Projects\n{new_entry}")
-    LAB_MEMORY.write_text(memory)
-    print(f"  {green('✓')} Updated LAB_MEMORY.md")
+        LAB_MEMORY.write_text(memory)
+        print(f"  {green('✓')} Updated LAB_MEMORY.md")
 
     # Obsidian folder
     if cfg.get("obsidian_vault"):
@@ -537,7 +526,21 @@ def cmd_add_project():
             (proj_dir / "drafts").mkdir(exist_ok=True)
             print(f"  {green('✓')} Obsidian folder: Research/Projects/{slug}/")
 
-    # Award XP
+
+# ── --add-project ──────────────────────────────────────────────────────────────
+def cmd_add_project():
+    cfg = load_json(LAB_CONFIG)
+    if not cfg:
+        print(red("❌ No LAB_CONFIG.json found. Run lab-init first."))
+        sys.exit(1)
+
+    print(f"\n{bold('── Add New Project ─────────────────────────')}")
+    project = collect_first_project()
+    if not project:
+        print("Cancelled.")
+        return
+
+    _write_project(cfg, project)
     award_xp("new_project_added", 50)
     print(f"\n{green('✅')} Project '{project['name']}' added! +50 XP 🏆")
 
@@ -700,9 +703,33 @@ def main():
     parser.add_argument("--update-prefs", action="store_true", help="Update preferences")
     parser.add_argument("--status", action="store_true", help="Show lab status")
     parser.add_argument("--reset", action="store_true", help="Full reset")
+
+    # Non-interactive flags for AI-mediated project creation
+    parser.add_argument("--name",       type=str, help="Project name (non-interactive)")
+    parser.add_argument("--desc",       type=str, help="Project description (non-interactive)")
+    parser.add_argument("--hypothesis", type=str, default="", help="Main hypothesis (optional)")
+    parser.add_argument("--proj-status",type=str, default="active",
+                        choices=["idea","active","writing","submitted","published"],
+                        help="Project status (default: active)")
+
     args = parser.parse_args()
 
-    if args.add_project:
+    # Non-interactive project creation (AI calls this with pre-filled args)
+    if args.name and args.desc:
+        cfg = load_json(LAB_CONFIG)
+        if not cfg:
+            print("❌ No LAB_CONFIG.json found. Run lab-init first.")
+            sys.exit(1)
+        project = {
+            "name": args.name,
+            "description": args.desc,
+            "hypothesis": args.hypothesis,
+            "status": args.proj_status
+        }
+        _write_project(cfg, project)
+        award_xp("new_project_added", 50)
+        print(f"✅ Project '{args.name}' added! +50 XP")
+    elif args.add_project:
         cmd_add_project()
     elif args.update_prefs:
         cmd_update_prefs()
