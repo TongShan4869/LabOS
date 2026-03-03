@@ -140,19 +140,75 @@ def collect_identity():
     disciplines = ask_list("Disciplines spanned", default="biomedical, computational")
     return name, stage, fields, disciplines
 
-def collect_tools():
-    print(f"\n{bold('── Tools ───────────────────────────────────')}")
-    obsidian = None
-    if confirm("Do you use Obsidian?"):
-        raw = ask("Path to your Obsidian vault", default=str(Path.home() / "obsidian-vault"))
-        obsidian = raw if raw else None
+def create_obsidian_vault(vault_path):
+    """Create a new Obsidian vault directory with a .obsidian stub."""
+    vault = Path(vault_path)
+    vault.mkdir(parents=True, exist_ok=True)
+    (vault / ".obsidian").mkdir(exist_ok=True)
+    # Minimal app.json so Obsidian recognises it as a vault
+    (vault / ".obsidian" / "app.json").write_text("{}")
+    print(f"  {green('✓')} New Obsidian vault created at {vault_path}")
+    print(f"  {dim('→ Open Obsidian → \"Open folder as vault\" → select this folder')}")
+    return vault_path
 
+def collect_tools():
+    print(f"\n{bold('── Knowledge Store ─────────────────────────')}")
+    print("LabOS can save paper summaries, digests, and project notes to Obsidian or Notion.")
+    print()
+
+    obsidian = None
     notion_db = None
-    if confirm("Do you use Notion for research notes?", default="n"):
-        notion_db = ask("Notion research database ID (or press Enter to skip)", default="")
+
+    store_choice = ask(
+        "Where should LabOS store your research notes?",
+        default="1",
+        choices=["1", "2", "3"]
+    )
+    print("  1 = Obsidian (recommended — local, Markdown, free)")
+    print("  2 = Notion")
+    print("  3 = Skip for now")
+    store_choice = ask("Choice", default="1", choices=["1", "2", "3"])
+
+    if store_choice == "1":
+        print()
+        vault_action = ask(
+            "Obsidian vault",
+            default="1",
+            choices=["1", "2"]
+        )
+        print("  1 = Create a new vault for LabOS")
+        print("  2 = Use an existing vault")
+        vault_action = ask("Choice", default="1", choices=["1", "2"])
+
+        if vault_action == "1":
+            default_path = str(Path.home() / "LabOS-Vault")
+            raw = ask("Where to create the new vault?", default=default_path)
+            obsidian = create_obsidian_vault(raw or default_path)
+        else:
+            raw = ask("Path to your existing Obsidian vault", default=str(Path.home() / "obsidian-vault"))
+            obsidian = raw if raw else None
+            if obsidian and not Path(obsidian).exists():
+                print(f"  {yellow('⚠')}  Path does not exist — will try to create it during setup")
+
+    elif store_choice == "2":
+        print()
+        print(f"  {cyan('Notion setup:')}")
+        print("  1. Go to notion.so → create a new page called 'LabOS Research'")
+        print("  2. Add a Database (table) called 'Papers'")
+        print("  3. Share → Copy link → paste the database ID (32-char hex after last /)")
+        print()
+        notion_db = ask("Notion database ID (or Enter to skip)", default="")
         if not notion_db:
             notion_db = None
+            print(f"  {yellow('⚠')}  Notion not connected — you can add it later via --update-prefs")
+        else:
+            print(f"  {green('✓')} Notion DB ID saved")
 
+    else:
+        print(f"  {yellow('ℹ')}  No knowledge store set — digests will print to terminal only")
+        print("  You can connect one later with: python3 lab_init.py --update-prefs")
+
+    print(f"\n{bold('── Reference Manager ───────────────────────')}")
     zotero_type = None
     zotero_lib = None
     if confirm("Do you use Zotero?", default="n"):
@@ -162,9 +218,11 @@ def collect_tools():
             if not zotero_lib:
                 zotero_lib = None
 
-    print("Which databases do you mainly use?")
+    print(f"\n{bold('── Literature Databases ─────────────────────')}")
+    print("LabOS searches these for your weekly field digests and literature reviews.")
     dbs_input = ask_list(
-        "Databases", default="pubmed, openalex, arxiv, semanticscholar"
+        "Which databases? (pubmed, openalex, arxiv, semanticscholar, biorxiv)",
+        default="pubmed, openalex, arxiv"
     )
     valid_dbs = {"pubmed", "openalex", "arxiv", "semanticscholar", "biorxiv"}
     databases = [d.lower() for d in dbs_input if d.lower() in valid_dbs] or ["pubmed", "openalex", "arxiv"]
