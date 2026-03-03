@@ -1,0 +1,32 @@
+# Sensitive lab data — never commit these
+LAB_MEMORY.md
+sessions/
+.env.lab
+.env
+
+# Research data
+*.csv
+*.tsv
+*.xlsx
+*.mat
+*.nii
+*.nii.gz
+
+# Personal config (has vault paths, user info)
+# LAB_CONFIG.json is committed as a template (empty values)
+
+# Obsidian
+.obsidian/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# R
+.Rhistory
+.RData
+
+# OS
+.DS_Store
+Thumbs.db
