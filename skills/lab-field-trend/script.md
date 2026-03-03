@@ -42,7 +42,7 @@ neural coupling AND speech AND 2025[DP]
 curl "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=<query>&datetype=pdat&reldate=7&retmax=50&retmode=json"
 
 # Fetch abstracts
-curl "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=<ids>&rettype=abstract&retmode=json"
+curl "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=<ids>&rettype=abstract&retmode=xml"
 ```
 
 ### OpenAlex (free, no key required)
@@ -54,7 +54,7 @@ curl "https://api.openalex.org/works?filter=concepts.display_name:<field>,from_p
 ### arXiv (for CS/ML/physics fields)
 
 ```bash
-curl "https://export.arxiv.org/api/query?search_query=<field>&start=0&max_results=30&sortBy=submittedDate&sortOrder=descending"
+curl "https://export.arxiv.org/api/query?search_query=all:<field>&start=0&max_results=30&sortBy=submittedDate&sortOrder=descending"
 ```
 
 Deduplicate results against existing Paper nodes in research-graph.jsonl by DOI or title similarity.
