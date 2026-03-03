@@ -494,13 +494,28 @@ openclaw lab-biostat --mode "review-methods" --draft "path/to/methods.md"
 
 | Level | Title | XP Required |
 |---|---|---|
-| 1 | Rookie | 0 |
-| 2 | Junior Researcher | 300 |
-| 3 | Candidate | 800 |
-| 4 | Scholar | 2000 |
-| 5 | Senior Researcher | 4000 |
-| 6 | PI-in-Training | 7500 |
-| 7 | Principal Investigator | 12000 |
+| 1 | Confused First-Year | 0 |
+| 2 | Lab Gremlin | 300 |
+| 3 | Professional Coffee Drinker | 800 |
+| 4 | PhD Candidate *(ABD, technically)* | 2,000 |
+| 5 | Doctor of Suffering | 4,000 |
+| 6 | Postdoc (Indentured Servant Edition) | 7,500 |
+| 7 | Assistant Professor (Broke but Hopeful) | 12,000 |
+| 8 | Associate Professor (Tenure Track Anxiety) | 20,000 |
+| 9 | Tenured Professor (Finally Relaxed) | 30,000 |
+| 10 | Distinguished Chair of Something Important | 45,000 |
+| 11 | PI with a Waiting List | 65,000 |
+| 12 | Nature/Science Regular | 90,000 |
+| 13 | Nobel Shortlist Gossip | 120,000 |
+| 14 | Nobel Laureate | 160,000 |
+| 15 | Cited More Than Darwin | 210,000 |
+| 16 | Textbook Namesake | 270,000 |
+| 17 | The Field IS You | 340,000 |
+| 18 | Retired Legend Still Getting Awards | 420,000 |
+| 19 | Transcended Peer Review | 510,000 |
+| 20 | The Omniscient and Omnipotent Being of the Universe | ∞ |
+
+*Level 20 unlocks badge 🌌 Beyond Peer Review. All agents address you as "Your Omniscience."*
 
 ### Visual progression
 As XP increases, the Star Office UI lab space upgrades — more equipment, more agent slots unlocked, new pixel art zones appear.
@@ -598,6 +613,7 @@ User's current level and XP shown in the office UI header. Level-up triggers a v
 | 2026-03-03 | 0.4 | Added `lab-security` to MVP — credential audit, data classification, LLM leakage pre-flight |
 | 2026-03-03 | 0.5 | Added `lab-biostat` to MVP — full biostatistician agent with 6 modes |
 | 2026-03-03 | 0.6 | Renamed `lab-reviewer` → `lab-peer-reviewer`; added `lab-publishing-assistant` to MVP |
+| 2026-03-03 | 0.7 | Redesigned level system — 20 levels from Confused First-Year to The Omniscient and Omnipotent Being of the Universe |
 
 ---
 

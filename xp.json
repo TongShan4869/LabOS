@@ -3,7 +3,29 @@
   "level": 0,
   "level_title": "Not initialized",
   "xp": 0,
-  "xp_to_next": 100,
+  "xp_to_next": 0,
   "badges": [],
-  "history": []
+  "history": [],
+  "levels": [
+    {"level": 1,  "title": "Confused First-Year",                           "xp_required": 0},
+    {"level": 2,  "title": "Lab Gremlin",                                   "xp_required": 300},
+    {"level": 3,  "title": "Professional Coffee Drinker",                   "xp_required": 800},
+    {"level": 4,  "title": "PhD Candidate (ABD, technically)",              "xp_required": 2000},
+    {"level": 5,  "title": "Doctor of Suffering",                           "xp_required": 4000},
+    {"level": 6,  "title": "Postdoc (Indentured Servant Edition)",          "xp_required": 7500},
+    {"level": 7,  "title": "Assistant Professor (Broke but Hopeful)",       "xp_required": 12000},
+    {"level": 8,  "title": "Associate Professor (Tenure Track Anxiety)",    "xp_required": 20000},
+    {"level": 9,  "title": "Tenured Professor (Finally Relaxed)",           "xp_required": 30000},
+    {"level": 10, "title": "Distinguished Chair of Something Important",    "xp_required": 45000},
+    {"level": 11, "title": "PI with a Waiting List",                        "xp_required": 65000},
+    {"level": 12, "title": "Nature/Science Regular",                        "xp_required": 90000},
+    {"level": 13, "title": "Nobel Shortlist Gossip",                        "xp_required": 120000},
+    {"level": 14, "title": "Nobel Laureate",                                "xp_required": 160000},
+    {"level": 15, "title": "Cited More Than Darwin",                        "xp_required": 210000},
+    {"level": 16, "title": "Textbook Namesake",                             "xp_required": 270000},
+    {"level": 17, "title": "The Field IS You",                              "xp_required": 340000},
+    {"level": 18, "title": "Retired Legend Still Getting Awards",           "xp_required": 420000},
+    {"level": 19, "title": "Transcended Peer Review",                       "xp_required": 510000},
+    {"level": 20, "title": "The Omniscient and Omnipotent Being of the Universe", "xp_required": null}
+  ]
 }

@@ -133,7 +133,9 @@ LabOS rewards research milestones with XP and badges:
 | Submission prep | +300 | 🚀 Launcher |
 | Paper accepted | +1000 | 🏅 Published |
 
-**Levels:** Rookie → Junior Researcher → Candidate → Scholar → Senior Researcher → PI-in-Training → Principal Investigator
+**Levels:** Confused First-Year → Lab Gremlin → Professional Coffee Drinker → PhD Candidate → Doctor of Suffering → Postdoc (Indentured Servant Edition) → ... → Nobel Laureate → Cited More Than Darwin → The Field IS You → **The Omniscient and Omnipotent Being of the Universe** 🌌
+
+*Level 20 unlocks badge 🌌 Beyond Peer Review. All agents address you as "Your Omniscience."*
 
 ---
 
