@@ -614,14 +614,55 @@ def run(args):
     report_md = "\n".join(report_lines)
 
     # ── Save to Obsidian ───────────────────────────────────────────────────────
-    save_to_obsidian(cfg, query, top_papers, report_md)
+    vault = cfg.get("obsidian_vault")
+    query_slug = slugify(query)
+    if vault and Path(vault).exists():
+        lit_dir = Path(vault) / "Research" / "Literature"
+        lit_dir.mkdir(parents=True, exist_ok=True)
+        fname = f"{TODAY}-{query_slug}.md"
+        out_path = lit_dir / fname
+        out_path.write_text(report_md)
+        print(f"\n  {green('✓')} Report saved to Obsidian:")
+        print(f"     {bold(str(out_path))}")
+    else:
+        # Fallback: save to sessions folder
+        fallback = LAB_DIR / "sessions" / f"{TODAY}-{query_slug}.md"
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        fallback.write_text(report_md)
+        print(f"\n  {yellow('⚠')}  No Obsidian vault configured — saved to:")
+        print(f"     {bold(str(fallback))}")
+        print(f"     Run {cyan('lab-init --update-prefs')} to connect your vault.")
 
-    # ── Export RIS for Zotero ──────────────────────────────────────────────────
-    if cfg.get("zotero_type"):
-        ris_path = LAB_DIR / "sessions" / f"{TODAY}-{slugify(query)}.ris"
-        ris_path.parent.mkdir(parents=True, exist_ok=True)
-        export_ris(top_papers, ris_path)
-        print(f"  {green('✓')} RIS exported: {ris_path.name} — import into Zotero manually")
+    # ── Interactive Zotero prompt ──────────────────────────────────────────────
+    # Always ask — even if Zotero not configured yet
+    ris_path = LAB_DIR / "sessions" / f"{TODAY}-{query_slug}.ris"
+    ris_path.parent.mkdir(parents=True, exist_ok=True)
+    export_ris(top_papers, ris_path)   # always write RIS so it's ready
+
+    print()
+    try:
+        ans = input(f"  {cyan('?')} Import these papers into Zotero? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        ans = "n"
+
+    if ans in ("y", "yes"):
+        if cfg.get("zotero_type") == "web":
+            print(f"\n  {bold('Zotero import steps:')}")
+            print(f"  1. Open Zotero desktop app (or zotero.org)")
+            print(f"  2. File → Import → {bold(str(ris_path))}")
+            print(f"  3. Or drag-drop the .ris file into your library")
+            print(f"\n  {green('✓')} RIS file ready: {ris_path}")
+        elif cfg.get("zotero_type") == "local":
+            print(f"\n  {bold('Zotero import:')}")
+            print(f"  File → Import → {bold(str(ris_path))}")
+            print(f"\n  {green('✓')} RIS file ready: {ris_path}")
+        else:
+            print(f"\n  {yellow('Zotero not connected yet.')}")
+            print(f"  Set it up with: {cyan('python3 lab_init.py --update-prefs')}")
+            print(f"\n  Your .ris file is ready when you do:")
+            print(f"  {bold(str(ris_path))}")
+    else:
+        print(f"  {dim('Skipped. RIS saved at:')} {dim(str(ris_path))}")
 
     # ── Write to research-graph.jsonl ─────────────────────────────────────────
     paper_refs = []
