@@ -123,6 +123,7 @@ body {
   z-index: 20;
   transition: transform 0.1s;
   user-select: none;
+  transform: translateY(-50%);  /* anchor: center of sprite at top/left coords */
 }
 
 .agent-sprite:hover { transform: scale(1.1); }

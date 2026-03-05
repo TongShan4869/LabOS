@@ -10,49 +10,49 @@ const AGENTS = {
     id: "main", name: "醋の虾", role: "Principal Investigator",
     emoji: "🦞", zone: "pi-desk", color: "#e63946",
     greeting: "Hey! What are you working on today?",
-    pos: { left: "80%", top: "20%" },  // PI desk — top right, trophies + plant
+    pos: { left: "80%", top: "33%" },  // PI desk — top right
   },
   scout: {
     id: "scout", name: "Scout", role: "Literature Search",
     emoji: "🔬", zone: "bookshelf", color: "#2a9d8f",
     greeting: "Need me to dig into the literature? Just give me a query.",
-    pos: { left: "5%", top: "22%" },   // Bookshelf — far left
+    pos: { left: "5%", top: "35%" },   // Bookshelf — far left
   },
   stat: {
     id: "stat", name: "Stat", role: "Biostatistician",
     emoji: "📊", zone: "bench", color: "#457b9d",
     greeting: "Got data to analyze? I'll run the numbers and show my work.",
-    pos: { left: "28%", top: "18%" },  // Analysis bench — center-left, microscope
+    pos: { left: "28%", top: "32%" },  // Analysis bench — microscope + computer
   },
   quill: {
     id: "quill", name: "Quill", role: "Writing Assistant",
     emoji: "✍️", zone: "desk", color: "#e9c46a",
     greeting: "Ready to draft something? Tell me the section and project.",
-    pos: { left: "60%", top: "22%" },  // Writing desk — lamp + papers + ink
+    pos: { left: "60%", top: "33%" },  // Writing desk — lamp + papers
   },
   sage: {
     id: "sage", name: "Sage", role: "Research Advisor",
     emoji: "🎓", zone: "advisor-chair", color: "#6d6875",
     greeting: "Let's talk about your research. What's the current hypothesis?",
-    pos: { left: "8%", top: "68%" },   // Armchairs — bottom left
+    pos: { left: "8%", top: "65%" },   // Armchairs — bottom left
   },
   critic: {
     id: "critic", name: "Critic", role: "Peer Reviewer",
     emoji: "🤺", zone: "review-table", color: "#e76f51",
     greeting: "Drop your draft. I'll tear it apart so reviewers don't have to.",
-    pos: { left: "42%", top: "68%" },  // Review table — red-pen papers center
+    pos: { left: "42%", top: "65%" },  // Review table — red-pen papers center
   },
   trend: {
     id: "trend", name: "Trend", role: "Field Monitor",
     emoji: "📰", zone: "news-board", color: "#52b788",
     greeting: "I monitor your field 24/7. Want the latest digest?",
-    pos: { left: "44%", top: "8%" },   // Cork board — TRENDS chart top center
+    pos: { left: "42%", top: "18%" },  // Cork board — TRENDS chart top center
   },
   warden: {
     id: "warden", name: "Warden", role: "Security",
     emoji: "🔒", zone: "security-console", color: "#555577",
     greeting: "Everything looks secure. Want me to run an audit?",
-    pos: { left: "78%", top: "68%" },  // Security console — green monitors bottom right
+    pos: { left: "78%", top: "65%" },  // Security console — green monitors bottom right
   },
 };
 
