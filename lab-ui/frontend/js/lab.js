@@ -10,49 +10,49 @@ const AGENTS = {
     id: "main", name: "醋の虾", role: "Principal Investigator",
     emoji: "🦞", zone: "pi-desk", color: "#e63946",
     greeting: "Hey! What are you working on today?",
-    pos: { left: "81%", top: "58%" },
+    pos: { left: "80%", top: "20%" },  // PI desk — top right, trophies + plant
   },
   scout: {
     id: "scout", name: "Scout", role: "Literature Search",
     emoji: "🔬", zone: "bookshelf", color: "#2a9d8f",
     greeting: "Need me to dig into the literature? Just give me a query.",
-    pos: { left: "7%", top: "18%" },
+    pos: { left: "5%", top: "22%" },   // Bookshelf — far left
   },
   stat: {
     id: "stat", name: "Stat", role: "Biostatistician",
     emoji: "📊", zone: "bench", color: "#457b9d",
     greeting: "Got data to analyze? I'll run the numbers and show my work.",
-    pos: { left: "30%", top: "16%" },
+    pos: { left: "28%", top: "18%" },  // Analysis bench — center-left, microscope
   },
   quill: {
     id: "quill", name: "Quill", role: "Writing Assistant",
     emoji: "✍️", zone: "desk", color: "#e9c46a",
     greeting: "Ready to draft something? Tell me the section and project.",
-    pos: { left: "78%", top: "18%" },
+    pos: { left: "60%", top: "22%" },  // Writing desk — lamp + papers + ink
   },
   sage: {
     id: "sage", name: "Sage", role: "Research Advisor",
     emoji: "🎓", zone: "advisor-chair", color: "#6d6875",
     greeting: "Let's talk about your research. What's the current hypothesis?",
-    pos: { left: "7%", top: "60%" },
+    pos: { left: "8%", top: "68%" },   // Armchairs — bottom left
   },
   critic: {
     id: "critic", name: "Critic", role: "Peer Reviewer",
     emoji: "🤺", zone: "review-table", color: "#e76f51",
     greeting: "Drop your draft. I'll tear it apart so reviewers don't have to.",
-    pos: { left: "37%", top: "58%" },
+    pos: { left: "42%", top: "68%" },  // Review table — red-pen papers center
   },
   trend: {
     id: "trend", name: "Trend", role: "Field Monitor",
     emoji: "📰", zone: "news-board", color: "#52b788",
     greeting: "I monitor your field 24/7. Want the latest digest?",
-    pos: { left: "55%", top: "16%" },
+    pos: { left: "44%", top: "8%" },   // Cork board — TRENDS chart top center
   },
   warden: {
     id: "warden", name: "Warden", role: "Security",
     emoji: "🔒", zone: "security-console", color: "#555577",
     greeting: "Everything looks secure. Want me to run an audit?",
-    pos: { left: "62%", top: "60%" },
+    pos: { left: "78%", top: "68%" },  // Security console — green monitors bottom right
   },
 };
 
@@ -99,11 +99,20 @@ function buildAgentSprites() {
 
     el.innerHTML = `
       <div class="agent-status-bubble" id="bubble-${id}"></div>
-      <div class="agent-body" style="background:${agent.color}88;border-color:${agent.color}">
-        ${agent.emoji}
+      <div class="agent-sprite-img" id="sprite-img-${id}"
+           style="width:64px;height:96px;background-image:url('assets/sprites/sprite-${id}.png');background-repeat:no-repeat;background-size:256px 96px;background-position:0 0;image-rendering:pixelated;"
+           data-frame="0">
       </div>
       <div class="agent-name">${agent.name}</div>
     `;
+
+    // Start idle animation
+    let frame = 0;
+    const spriteEl = el.querySelector('.agent-sprite-img');
+    setInterval(() => {
+      frame = (frame + 1) % 4;
+      spriteEl.style.backgroundPositionX = \`\${-frame * 64}px\`;
+    }, 400);
 
     el.addEventListener("click", () => openDialogue(id));
     scene.appendChild(el);
@@ -152,15 +161,9 @@ function openDialogue(agentId) {
 
   state.activeAgent = agentId;
 
-  // Set portrait — use PNG if available, fall back to emoji
+  // Set portrait
+  dlgAvatar.textContent  = agent.emoji;
   dlgAvatar.style.borderColor = agent.color;
-  const avatarImg = new Image();
-  avatarImg.src = `assets/avatars/avatar-${agentId}.png`;
-  avatarImg.alt = agent.name;
-  avatarImg.style.cssText = "width:100%;height:100%;object-fit:contain;image-rendering:pixelated";
-  avatarImg.onerror = () => { dlgAvatar.textContent = agent.emoji; };
-  dlgAvatar.innerHTML = "";
-  dlgAvatar.appendChild(avatarImg);
   dlgNameTag.textContent = agent.name;
   dlgNameTag.style.background = agent.color;
   dlgNameTag.style.color = "#fff";
