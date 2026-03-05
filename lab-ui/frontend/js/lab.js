@@ -175,6 +175,15 @@ function openDialogue(agentId) {
   // Clear notification badge if any
   clearAgentNotification(agentId);
 
+  // If this agent has a pending checkpoint, restore checkpoint mode
+  if (state.checkpointAgent === agentId) {
+    setTimeout(() => {
+      dlgInput.placeholder = "Reply to checkpoint...";
+      dlgInput.disabled = false;
+      dlgInput.focus();
+    }, 100);
+  }
+
   // Set portrait — PNG avatar with emoji fallback
   dlgAvatar.style.borderColor = agent.color;
   dlgAvatar.innerHTML = "";
@@ -195,7 +204,7 @@ function openDialogue(agentId) {
   dlgOverlay.classList.remove("hidden");
   dlgInput.disabled   = false;
   dlgInput.value      = "";
-  state.waitingReply  = false;
+  // Don't reset waitingReply — agent may still be processing
 
   // Play greeting or last message
   const history = getLocalHistory(agentId);
@@ -230,17 +239,19 @@ function sendMessage() {
   dlgInput.value = "";
 
   if (state.checkpointAgent === agentId) {
-    // Checkpoint reply
+    // Checkpoint reply — feed to running skill's stdin
     appendLocalHistory(agentId, "user", text);
     renderHistory(agentId);
     dlgInput.disabled = true;
     dlgInput.placeholder = "Type a message...";
     state.socket.emit("checkpoint_reply", { agent_id: agentId, text });
     state.checkpointAgent = null;
-    typewrite(`${AGENTS[agentId].name} is processing...`);
+    state.waitingReply = true;
+    typewrite(`${AGENTS[agentId].name} is processing your reply...`);
     return;
   }
 
+  // Don't allow new messages while agent is working (unless it's a checkpoint)
   if (state.waitingReply) return;
   state.waitingReply = true;
 
@@ -297,17 +308,22 @@ function handleCheckpoint(data) {
 
   appendLocalHistory(agent_id, "agent", `🔀 ${prompt}`, ts);
 
+  // ALWAYS set checkpointAgent — even if dialogue is closed
+  state.checkpointAgent = agent_id;
+  state.waitingReply = false;  // Allow input
+
   if (state.activeAgent === agent_id) {
     renderHistory(agent_id);
     typewrite(`🔀 ${prompt}`, () => {
       dlgInput.disabled = false;
       dlgInput.placeholder = "Reply to checkpoint...";
       dlgInput.focus();
-      state.checkpointAgent = agent_id;
     });
   } else {
+    // Show notification — user needs to click the agent
+    addAgentNotification(agent_id, `🔀 ${prompt}`, ts);
     const agent = AGENTS[agent_id];
-    showToast(`${agent.emoji} ${agent_name} needs input: ${prompt.slice(0, 80)}`);
+    showToast(`${agent.emoji} ${agent_name} needs your input!`);
   }
 }
 
