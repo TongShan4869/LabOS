@@ -176,14 +176,14 @@ body {
 
 .agent-sprite.working .agent-status-bubble { opacity: 1; }
 
-/* Working pulse animation */
+/* Working pulse animation — drop-shadow follows sprite silhouette */
 .agent-sprite.working .agent-sprite-img {
-  animation: pulse 1.2s ease-in-out infinite;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 3px 0 rgba(0,0,0,0.6), 0 0 12px rgba(255,255,255,0.1); }
-  50%       { box-shadow: 0 3px 0 rgba(0,0,0,0.6), 0 0 24px rgba(255,220,0,0.5); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255,220,0,0.2)) drop-shadow(0 4px 2px rgba(0,0,0,0.5)); }
+  50%      { filter: drop-shadow(0 0 12px rgba(255,220,0,0.7)) drop-shadow(0 0 20px rgba(255,200,0,0.3)) drop-shadow(0 4px 2px rgba(0,0,0,0.5)); }
 }
 
 /* Click hint */

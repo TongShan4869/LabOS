@@ -126,6 +126,11 @@ AGENTS = {
     },
 }
 
+# ─── Clear stale agent state on startup ──────────────────────────────────────
+for _f in [ROOT_DIR / "state.json", ROOT_DIR / "agents-state.json"]:
+    if _f.exists():
+        _f.unlink()
+
 # ─── App setup ────────────────────────────────────────────────────────────────
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
