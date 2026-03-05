@@ -1,9 +1,11 @@
 # LabOS Avatar Prompts 🦞
 
 **Background:** solid flat lime green, RGB(0,255,0)  
-**Style:** pixel art, chibi, bust shot, hard pixel edges, no anti-aliasing, no shadows, no gradients  
+**Style:** pixel art, super cute chibi kawaii, big sparkly eyes, round chubby face, bust shot, hard pixel edges, no anti-aliasing, no shadows, no gradients  
 **Size:** 110×110  
 **Format:** PNG  
+
+> 💡 Cute boosters in every prompt: big round eyes, rosy cheeks, tiny cute mouth, chubby round head, soft pastel accessories
 
 ---
 
@@ -11,7 +13,7 @@
 **Character:** Classic red American lobster — PI / Principal Investigator
 
 ```
-Pixel art portrait bust shot, chibi classic red American lobster scientist wearing white PI lab coat, big claws holding a coffee mug, cheerful boss expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi classic red American lobster scientist, big sparkling round eyes, chubby rosy cheeks, tiny happy smile, wearing oversized white lab coat with a little heart badge, big claws hugging a steaming coffee mug, fluffy appearance, adorable boss energy, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
@@ -20,7 +22,7 @@ Pixel art portrait bust shot, chibi classic red American lobster scientist weari
 **Character:** Spiny lobster (no claws, long antennae) — Literature Scout
 
 ```
-Pixel art portrait bust shot, chibi spiny lobster scientist, long antennae, teal green lab coat, holding magnifying glass with spiny arm, curious excited expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi spiny lobster scientist, big sparkling round eyes, chubby rosy cheeks, tiny excited open smile, long bouncy antennae with little stars on tips, teal green lab coat with a tiny magnifying glass charm, curious adorable expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
@@ -29,7 +31,7 @@ Pixel art portrait bust shot, chibi spiny lobster scientist, long antennae, teal
 **Character:** Rare blue lobster — Biostatistician
 
 ```
-Pixel art portrait bust shot, chibi rare blue lobster scientist, electric blue shell, glasses perched on eyestalk, blue lab coat, holding clipboard with tiny bar graphs, focused serious expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi rare blue lobster scientist, big sparkling round eyes with tiny glasses, electric blue round chubby shell, rosy cheeks, small serious but adorable expression, blue lab coat with tiny chart pattern, hugging a mini clipboard with a cute bar graph, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
@@ -38,7 +40,7 @@ Pixel art portrait bust shot, chibi rare blue lobster scientist, electric blue s
 **Character:** Slipper lobster (flat shovel face) — Writing Assistant
 
 ```
-Pixel art portrait bust shot, chibi slipper lobster scientist, flat wide shovel-shaped head, yellow lab coat, holding feather quill pen, gentle creative expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi slipper lobster scientist, flat wide shovel-shaped face with big sparkly round eyes, rosy round cheeks, soft dreamy smile, sunshine yellow lab coat with a tiny star brooch, holding a oversized fluffy feather quill pen, creative gentle adorable expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
@@ -47,7 +49,7 @@ Pixel art portrait bust shot, chibi slipper lobster scientist, flat wide shovel-
 **Character:** Langoustine / Norway lobster (slim, elegant) — Research Advisor
 
 ```
-Pixel art portrait bust shot, chibi elegant langoustine lobster professor, slim pale orange body, tiny monocle, purple academic robe with tiny mortarboard hat, wise grandfatherly expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi langoustine lobster professor, slim pale peachy-orange body, big warm round sparkly eyes, rosy cheeks, gentle grandpa smile, tiny round glasses, purple academic robe with gold trim, adorable tiny mortarboard hat tilted slightly, wise and cozy expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
@@ -56,16 +58,16 @@ Pixel art portrait bust shot, chibi elegant langoustine lobster professor, slim 
 **Character:** Mantis shrimp (iridescent, aggressive) — Peer Reviewer
 
 ```
-Pixel art portrait bust shot, chibi mantis shrimp scientist, iridescent rainbow shell, fierce striking claws, orange-red coat, holding red pen aggressively, skeptical one-eyebrow-raised expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi mantis shrimp scientist, iridescent pastel rainbow shell, big round eyes with one eyebrow raised skeptically but still adorable, chubby rosy cheeks, tiny pouty mouth, orange-red lab coat, holding an oversized red pen with a dramatic flair, cute grumpy expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
 
 ## avatar-trend.png
-**Character:** Ghost lobster (pale, semi-transparent look) — Field Monitor
+**Character:** Ghost lobster (pale, glowing) — Field Monitor
 
 ```
-Pixel art portrait bust shot, chibi ghost lobster scientist, pale white-blue glowing shell, green lab coat, excited expression, tiny newspaper in claw, bioluminescent pixel glow, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi ghost lobster scientist, pale white-blue translucent round chubby body, big starry sparkly round eyes, soft glowing pixel aura, rosy cheeks, open excited smile, green lab coat with tiny antenna sticking up, holding a teeny tiny rolled newspaper, energetic adorable expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
@@ -74,7 +76,7 @@ Pixel art portrait bust shot, chibi ghost lobster scientist, pale white-blue glo
 **Character:** Deep sea black lobster — Security
 
 ```
-Pixel art portrait bust shot, chibi deep sea black lobster scientist, jet black shell with faint red glowing eyes, dark navy security uniform, lock badge on chest, stoic serious expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi deep sea black lobster scientist, jet black shiny round chubby shell, big round serious eyes with tiny red pixel glow, rosy cheeks, small calm determined expression, dark navy uniform with a shiny gold lock badge, tiny claw saluting, secretly adorable despite being tough, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
