@@ -218,6 +218,54 @@ def api_history(agent_id):
 
 # ─── WebSocket: agent conversation ────────────────────────────────────────────
 
+
+@app.route("/api/config")
+def api_config():
+    config_file = ROOT_DIR.parent / "LAB_CONFIG.json"
+    if config_file.exists():
+        try:
+            config = json.loads(config_file.read_text())
+            return jsonify(config)
+        except Exception:
+            pass
+    return jsonify({})
+
+
+@app.route("/api/init", methods=["POST"])
+def api_init():
+    data = request.json or {}
+    lab_name = data.get("lab_name", "My Lab")
+    obsidian_path = data.get("obsidian_path", "")
+    notion_db = data.get("notion_db", "")
+    zotero = data.get("zotero", False)
+    project_name = data.get("project_name", "First Project")
+    field = data.get("field", "Research")
+    
+    config = {
+        "lab_name": lab_name,
+        "integrations": {
+            "obsidian": obsidian_path if obsidian_path else None,
+            "notion": notion_db if notion_db else None,
+            "zotero": zotero,
+        },
+        "projects": [
+            {
+                "name": project_name,
+                "field": field,
+                "created": datetime.now().isoformat(),
+            }
+        ],
+        "created_at": datetime.now().isoformat(),
+    }
+    
+    config_file = ROOT_DIR.parent / "LAB_CONFIG.json"
+    try:
+        config_file.write_text(json.dumps(config, indent=2))
+        return jsonify({"ok": True, "config": config})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @socketio.on("connect")
 def on_connect():
     emit("lab_status", get_lab_status())

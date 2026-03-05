@@ -676,3 +676,405 @@ body {
   font-size: 10px;
   color: rgba(255,255,255,0.3);
 }
+
+/* ── Onboarding Flow ───────────────────────────────────── */
+#onboarding-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s;
+}
+
+#onboarding-overlay.hidden { display: none; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#onboarding-content {
+  width: min(600px, 90vw);
+  text-align: center;
+}
+
+.onboarding-step {
+  display: block;
+  animation: stepSlide 0.3s ease-out;
+}
+
+.onboarding-step.hidden { display: none; }
+
+@keyframes stepSlide {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.onboard-logo {
+  font-size: 72px;
+  margin-bottom: 20px;
+  animation: logoBounce 0.6s ease-out;
+}
+
+@keyframes logoBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.onboard-title {
+  font-family: var(--pixel-font), monospace;
+  font-size: 18px;
+  color: var(--gold);
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+
+.onboard-desc {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 30px;
+  max-width: 450px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.onboard-input {
+  width: 100%;
+  max-width: 400px;
+  background: var(--lab-floor);
+  border: 3px solid var(--hud-border);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  outline: none;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+}
+
+.onboard-input.small {
+  max-width: 350px;
+  margin-left: 30px;
+  margin-bottom: 20px;
+}
+
+.onboard-input:focus {
+  border-color: var(--gold);
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.3), 0 0 0 2px rgba(233,196,106,0.3);
+}
+
+.onboard-checkboxes {
+  margin-bottom: 30px;
+  text-align: left;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.onboard-checkbox-label {
+  display: flex;
+  align-items: center;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.onboard-checkbox-label input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.onboard-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.onboard-btn {
+  background: var(--gold);
+  border: 3px solid var(--dlg-shadow);
+  color: var(--dlg-text);
+  font-family: var(--pixel-font), monospace;
+  font-size: 10px;
+  padding: 12px 30px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--dlg-shadow);
+  transition: transform 0.1s, box-shadow 0.1s;
+  letter-spacing: 1px;
+}
+
+.onboard-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--dlg-shadow);
+}
+
+.onboard-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--dlg-shadow);
+}
+
+.onboard-btn.secondary {
+  background: var(--lab-floor);
+  color: var(--text-dim);
+}
+
+.onboard-spinner {
+  font-size: 64px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Loading Screen ──────────────────────────────────── */
+#loading-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 3500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s;
+}
+
+#loading-screen.hidden { display: none; }
+
+#loading-content {
+  text-align: center;
+  width: min(500px, 90vw);
+}
+
+.loading-logo {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: logoPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.8; }
+}
+
+.loading-title {
+  font-family: var(--pixel-font), monospace;
+  font-size: 16px;
+  color: var(--gold);
+  margin-bottom: 30px;
+  letter-spacing: 2px;
+}
+
+#loading-bar-wrap {
+  width: 100%;
+  height: 20px;
+  background: #111;
+  border: 3px solid var(--hud-border);
+  margin-bottom: 20px;
+  image-rendering: pixelated;
+}
+
+#loading-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--gold));
+  width: 0%;
+  transition: width 0.3s ease-out;
+}
+
+#loading-message {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  animation: messageFade 2s ease-in-out infinite;
+}
+
+@keyframes messageFade {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* ── XP Info Modal ───────────────────────────────────── */
+#xp-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s;
+}
+
+#xp-modal-overlay.hidden { display: none; }
+
+#xp-modal {
+  background: var(--lab-floor);
+  border: 4px solid var(--hud-border);
+  box-shadow: 8px 8px 0 rgba(0,0,0,0.5);
+  width: min(550px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 24px 28px;
+  position: relative;
+  animation: modalSlide 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalSlide {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+#xp-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #5c2626;
+  border: 2px solid #8b3a3a;
+  color: #ffaaaa;
+  font-family: var(--pixel-font), monospace;
+  font-size: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#xp-modal-close:hover {
+  background: #7c3636;
+}
+
+.xp-modal-title {
+  font-family: var(--pixel-font), monospace;
+  font-size: 16px;
+  color: var(--gold);
+  margin-bottom: 24px;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.xp-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.xp-section:last-child {
+  border-bottom: none;
+}
+
+.xp-current-level {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.xp-level-num {
+  font-family: var(--pixel-font), monospace;
+  font-size: 32px;
+  color: var(--gold);
+}
+
+.xp-level-title {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.xp-progress-detail {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#xp-modal-bar-wrap {
+  width: 100%;
+  height: 16px;
+  background: #111;
+  border: 2px solid var(--hud-border);
+  image-rendering: pixelated;
+}
+
+#xp-modal-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  transition: width 0.5s;
+  width: 0%;
+}
+
+.xp-section-title {
+  font-family: var(--pixel-font), monospace;
+  font-size: 10px;
+  color: var(--gold);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.xp-levels-list {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.xp-level-item {
+  padding: 4px 0;
+}
+
+#xp-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.xp-badge {
+  background: rgba(69, 123, 157, 0.3);
+  border: 2px solid var(--accent2);
+  color: var(--accent2);
+  font-family: monospace;
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 4px;
+}
+
+#xp-history {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.8;
+}
+
+.xp-history-item {
+  padding: 4px 0;
+  border-left: 2px solid var(--accent2);
+  padding-left: 10px;
+  margin-bottom: 6px;
+}
+
+/* Make HUD left clickable */
+#hud-left {
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 4px 8px;
+  border-radius: 2px;
+}
+
+#hud-left:hover {
+  background: rgba(255,255,255,0.05);
+}

@@ -85,6 +85,139 @@
   <!-- ── Notification toast ───────────────────── -->
   <div id="toast-container"></div>
 
+  <!-- ── Onboarding Flow ──────────────────────── -->
+  <div id="onboarding-overlay" class="hidden">
+    <div id="onboarding-content">
+      <!-- Step 1: Welcome -->
+      <div class="onboarding-step" id="onboard-step-1">
+        <div class="onboard-logo">🔬 LabOS</div>
+        <h2 class="onboard-title">Welcome to Your Virtual Research Lab</h2>
+        <p class="onboard-desc">A Stardew Valley-style workspace where AI agents help you build, research, and publish.</p>
+        <button class="onboard-btn" onclick="nextOnboardStep(2)">Start Your Lab</button>
+      </div>
+
+      <!-- Step 2: Lab Name -->
+      <div class="onboarding-step hidden" id="onboard-step-2">
+        <h2 class="onboard-title">Name Your Lab</h2>
+        <p class="onboard-desc">What should we call your research space?</p>
+        <input type="text" id="onboard-lab-name" class="onboard-input" placeholder="e.g., Neural Coupling Lab" autocomplete="off" />
+        <div class="onboard-buttons">
+          <button class="onboard-btn secondary" onclick="nextOnboardStep(1)">Back</button>
+          <button class="onboard-btn" onclick="nextOnboardStep(3)">Next</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Integrations -->
+      <div class="onboarding-step hidden" id="onboard-step-3">
+        <h2 class="onboard-title">Connect Your Tools</h2>
+        <p class="onboard-desc">Optional integrations to sync your research ecosystem.</p>
+        <div class="onboard-checkboxes">
+          <label class="onboard-checkbox-label">
+            <input type="checkbox" id="onboard-obsidian" />
+            <span>Obsidian Vault</span>
+          </label>
+          <input type="text" id="onboard-obsidian-path" class="onboard-input small" placeholder="/path/to/vault" />
+          
+          <label class="onboard-checkbox-label">
+            <input type="checkbox" id="onboard-notion" />
+            <span>Notion Database</span>
+          </label>
+          <input type="text" id="onboard-notion-db" class="onboard-input small" placeholder="Database ID" />
+          
+          <label class="onboard-checkbox-label">
+            <input type="checkbox" id="onboard-zotero" />
+            <span>Zotero Library</span>
+          </label>
+        </div>
+        <div class="onboard-buttons">
+          <button class="onboard-btn secondary" onclick="nextOnboardStep(2)">Back</button>
+          <button class="onboard-btn" onclick="nextOnboardStep(4)">Next</button>
+        </div>
+      </div>
+
+      <!-- Step 4: First Project -->
+      <div class="onboarding-step hidden" id="onboard-step-4">
+        <h2 class="onboard-title">Create Your First Project</h2>
+        <p class="onboard-desc">Every great lab starts with a research question.</p>
+        <input type="text" id="onboard-project-name" class="onboard-input" placeholder="Project name" autocomplete="off" />
+        <input type="text" id="onboard-project-field" class="onboard-input" placeholder="Field/discipline (e.g., Neuroscience)" autocomplete="off" />
+        <div class="onboard-buttons">
+          <button class="onboard-btn secondary" onclick="nextOnboardStep(3)">Back</button>
+          <button class="onboard-btn" onclick="finishOnboarding()">Create Lab</button>
+        </div>
+      </div>
+
+      <!-- Step 5: Finalizing (shows briefly before loading screen) -->
+      <div class="onboarding-step hidden" id="onboard-step-5">
+        <div class="onboard-spinner">🦞</div>
+        <h2 class="onboard-title">Setting up your lab...</h2>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Loading Screen ────────────────────────── -->
+  <div id="loading-screen" class="hidden">
+    <div id="loading-content">
+      <div class="loading-logo">🔬</div>
+      <h2 class="loading-title">Initializing Lab...</h2>
+      <div id="loading-bar-wrap">
+        <div id="loading-bar"></div>
+      </div>
+      <p id="loading-message">Calibrating microscopes...</p>
+    </div>
+  </div>
+
+  <!-- ── XP Info Modal ─────────────────────────── -->
+  <div id="xp-modal-overlay" class="hidden">
+    <div id="xp-modal">
+      <button id="xp-modal-close">✕</button>
+      <h2 class="xp-modal-title">Lab Progress</h2>
+      
+      <div class="xp-section">
+        <div class="xp-current-level">
+          <span class="xp-level-num" id="xp-current-level">1</span>
+          <span class="xp-level-title" id="xp-current-title">Confused First-Year</span>
+        </div>
+        <div class="xp-progress-detail">
+          <span id="xp-current">0</span> / <span id="xp-next-level">100</span> XP
+        </div>
+        <div id="xp-modal-bar-wrap">
+          <div id="xp-modal-bar"></div>
+        </div>
+      </div>
+
+      <div class="xp-section">
+        <h3 class="xp-section-title">Level Titles</h3>
+        <div class="xp-levels-list">
+          <div class="xp-level-item">Level 1: Confused First-Year</div>
+          <div class="xp-level-item">Level 2: Lab Gremlin</div>
+          <div class="xp-level-item">Level 3: Hypothesis Wrangler</div>
+          <div class="xp-level-item">Level 4: Data Whisperer</div>
+          <div class="xp-level-item">Level 5: Methods Wizard</div>
+          <div class="xp-level-item">Level 6: Manuscript Maestro</div>
+          <div class="xp-level-item">Level 7: Grant Guru</div>
+          <div class="xp-level-item">Level 8: Peer Review Survivor</div>
+          <div class="xp-level-item">Level 9: Tenured Legend</div>
+          <div class="xp-level-item">Level 10: Nobel-Bound</div>
+        </div>
+      </div>
+
+      <div class="xp-section">
+        <h3 class="xp-section-title">Badges Earned</h3>
+        <div id="xp-badges">
+          <span class="xp-badge">🎯 First Steps</span>
+        </div>
+      </div>
+
+      <div class="xp-section">
+        <h3 class="xp-section-title">Recent XP</h3>
+        <div id="xp-history">
+          <div class="xp-history-item">+10 XP — Started LabOS</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/lab.js"></script>
 </body>
 </html>

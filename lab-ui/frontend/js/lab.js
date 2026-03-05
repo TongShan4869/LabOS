@@ -705,3 +705,181 @@ function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+// ── Onboarding & Loading Logic ────────────────────────────────────────────
+
+function checkOnboardingNeeded() {
+  const completed = localStorage.getItem('labos_onboarding_complete');
+  if (!completed) {
+    showOnboarding();
+  } else {
+    // Load lab config and update HUD title
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(data => {
+        if (data.lab_name) {
+          $('hud-title').textContent = `${data.lab_name} — LabOS`;
+        }
+      })
+      .catch(err => console.error('Failed to load config:', err));
+  }
+}
+
+function showOnboarding() {
+  $('onboarding-overlay').classList.remove('hidden');
+  $('onboard-step-1').classList.remove('hidden');
+}
+
+function nextOnboardStep(step) {
+  // Hide all steps
+  for (let i = 1; i <= 5; i++) {
+    $(`onboard-step-${i}`).classList.add('hidden');
+  }
+  // Show target step
+  $(`onboard-step-${step}`).classList.remove('hidden');
+}
+
+function finishOnboarding() {
+  const labName = $('onboard-lab-name').value.trim() || 'My Lab';
+  const obsidianPath = $('onboard-obsidian').checked ? $('onboard-obsidian-path').value.trim() : '';
+  const notionDb = $('onboard-notion').checked ? $('onboard-notion-db').value.trim() : '';
+  const zotero = $('onboard-zotero').checked;
+  const projectName = $('onboard-project-name').value.trim() || 'First Project';
+  const projectField = $('onboard-project-field').value.trim() || 'Research';
+
+  // Show finalizing step
+  nextOnboardStep(5);
+
+  // Send to backend
+  fetch('/api/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lab_name: labName,
+      obsidian_path: obsidianPath,
+      notion_db: notionDb,
+      zotero: zotero,
+      project_name: projectName,
+      field: projectField,
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      localStorage.setItem('labos_onboarding_complete', 'true');
+      // Hide onboarding, show loading screen
+      setTimeout(() => {
+        $('onboarding-overlay').classList.add('hidden');
+        showLoadingScreen(labName);
+      }, 1000);
+    } else {
+      alert('Failed to initialize lab. Please try again.');
+      nextOnboardStep(1);
+    }
+  })
+  .catch(err => {
+    console.error('Onboarding error:', err);
+    alert('Network error. Please check the server.');
+    nextOnboardStep(1);
+  });
+}
+
+function showLoadingScreen(labName) {
+  const loadingScreen = $('loading-screen');
+  const loadingBar = $('loading-bar');
+  const loadingMessage = $('loading-message');
+
+  const messages = [
+    "Calibrating microscopes...",
+    "Brewing coffee for agents...",
+    "Loading research papers...",
+    "Waking up the lab crew...",
+    "Organizing the bench...",
+    "Updating citations...",
+    "Almost there...",
+  ];
+
+  loadingScreen.classList.remove('hidden');
+  
+  let progress = 0;
+  let msgIndex = 0;
+  
+  const interval = setInterval(() => {
+    progress += Math.random() * 15 + 5; // 5-20% increments
+    if (progress > 100) progress = 100;
+    
+    loadingBar.style.width = progress + '%';
+    
+    if (msgIndex < messages.length - 1 && progress > (msgIndex + 1) * (100 / messages.length)) {
+      msgIndex++;
+      loadingMessage.textContent = messages[msgIndex];
+    }
+    
+    if (progress >= 100) {
+      clearInterval(interval);
+      setTimeout(() => {
+        loadingScreen.classList.add('hidden');
+        $('hud-title').textContent = `${labName} — LabOS`;
+      }, 500);
+    }
+  }, 200);
+}
+
+// ── XP Info Modal ──────────────────────────────────────────────────────────
+
+function showXpModal() {
+  const overlay = $('xp-modal-overlay');
+  overlay.classList.remove('hidden');
+  
+  // Load XP data from state
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(data => {
+      const xp = data.xp || { xp: 0, level: 1, level_title: 'Confused First-Year', badges: [] };
+      
+      $('xp-current-level').textContent = xp.level;
+      $('xp-current-title').textContent = xp.level_title;
+      $('xp-current').textContent = xp.xp;
+      
+      const nextLevelXp = xp.level * 100;
+      $('xp-next-level').textContent = nextLevelXp;
+      
+      const progress = Math.min((xp.xp / nextLevelXp) * 100, 100);
+      $('xp-modal-bar').style.width = progress + '%';
+      
+      // Update badges
+      const badgesContainer = $('xp-badges');
+      badgesContainer.innerHTML = '';
+      if (xp.badges && xp.badges.length > 0) {
+        xp.badges.forEach(badge => {
+          const el = document.createElement('span');
+          el.className = 'xp-badge';
+          el.textContent = badge;
+          badgesContainer.appendChild(el);
+        });
+      } else {
+        badgesContainer.innerHTML = '<span class="xp-badge">🎯 First Steps</span>';
+      }
+    })
+    .catch(err => console.error('Failed to load XP data:', err));
+}
+
+function closeXpModal() {
+  $('xp-modal-overlay').classList.add('hidden');
+}
+
+// ── Event Listeners ────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Check if onboarding needed
+  checkOnboardingNeeded();
+  
+  // XP modal listeners
+  $('hud-left').addEventListener('click', showXpModal);
+  $('xp-modal-close').addEventListener('click', closeXpModal);
+  $('xp-modal-overlay').addEventListener('click', (e) => {
+    if (e.target === $('xp-modal-overlay')) {
+      closeXpModal();
+    }
+  });
+});
