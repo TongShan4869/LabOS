@@ -64,6 +64,33 @@ A paper found in Project A is immediately available to Project B. Agents reason 
 
 ---
 
+## 💬 How to Interact with LabOS
+
+LabOS is **natural language first**. You don't run commands — you just talk to OpenClaw, and it figures out which agent to call.
+
+### Examples
+
+| You say... | What runs |
+|---|---|
+| "Find me papers on speech-music coupling in ASD" | `lab-lit-scout` |
+| "Draft my introduction for the neural coupling project" | `lab-writing-assistant --section introduction` |
+| "Advise me on my infant hearing project" | `lab-research-advisor --project infant-hearing` |
+| "What's new in my field this week?" | `lab-field-trend` |
+| "Analyze this dataset — is there a group difference?" | `lab-biostat --mode analyze` |
+| "Review my methods section" | `lab-peer-reviewer --mode methods-critique` |
+
+**The SKILL.md** in each skill folder teaches OpenClaw when to activate it and how to translate your words into the right flags. **The Python script** does the actual work. You never need to touch either directly.
+
+```
+You (natural language)
+    → OpenClaw matches intent to skill (via SKILL.md)
+    → Subagent runs Python script with right flags
+    → Results saved to Obsidian / Discord / research graph
+    → XP awarded
+```
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
