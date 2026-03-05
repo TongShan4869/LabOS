@@ -65,6 +65,8 @@ const state = {
   isTyping:       false,
   waitingReply:   false,
   socket:         null,
+  reports:        [],  // stored report outputs
+  pendingNotifs:  {},  // agent_id → {text, ts}
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -85,6 +87,8 @@ const reportName     = $("report-agent-name");
 const reportTs       = $("report-timestamp");
 const reportBody     = $("report-body");
 const reportClose    = $("report-close");
+const hudReports     = $("hud-reports");
+const hudReportsCount = $("hud-reports-count");
 const dlgHistory     = $("dialogue-history");
 const hudLevel       = $("hud-level");
 const hudXp          = $("hud-xp");
@@ -168,6 +172,9 @@ function openDialogue(agentId) {
 
   state.activeAgent = agentId;
 
+  // Clear notification badge if any
+  clearAgentNotification(agentId);
+
   // Set portrait — PNG avatar with emoji fallback
   dlgAvatar.style.borderColor = agent.color;
   dlgAvatar.innerHTML = "";
@@ -206,10 +213,11 @@ function openDialogue(agentId) {
 }
 
 function closeDialogue() {
+  dlgOverlay.classList.remove("shifted");
   dlgOverlay.classList.add("hidden");
   clearTimeout(state.typewriterTimer);
   state.activeAgent   = null;
-  state.waitingReply  = false;
+  // Don't reset waitingReply — agent may still be processing in background
 }
 
 // ── Send message ──────────────────────────────────────────────────────────────
@@ -251,27 +259,36 @@ function handleAgentReply(data) {
   state.waitingReply = false;
 
   const LONG_THRESHOLD = 200;
+  const isLong = text.length > LONG_THRESHOLD;
 
-  if (text.length > LONG_THRESHOLD) {
-    // Long output → open report panel
-    openReportPanel(agent_id, text, ts);
-    // Short summary in dialogue
-    if (state.activeAgent === agent_id) {
+  // Store report if long
+  if (isLong) {
+    storeReport(agent_id, text, ts);
+  }
+
+  if (state.activeAgent === agent_id) {
+    // Dialogue is open for this agent
+    if (isLong) {
+      openReportPanel(agent_id, text, ts);
+      dlgOverlay.classList.add("shifted");
       const summary = text.split("\n").filter(l => l.trim()).slice(0, 2).join(" ").slice(0, 100);
-      typewrite(`📋 Report ready — see panel →  (${summary}…)`, () => {
+      typewrite(`📋 Report ready — see panel →`, () => {
+        dlgInput.disabled = false;
+        dlgInput.focus();
+      });
+    } else {
+      renderHistory(agent_id);
+      typewrite(text, () => {
         dlgInput.disabled = false;
         dlgInput.focus();
       });
     }
-  } else if (state.activeAgent === agent_id) {
-    renderHistory(agent_id);
-    typewrite(text, () => {
-      dlgInput.disabled = false;
-      dlgInput.focus();
-    });
   } else {
+    // Agent not in focus — show notification on sprite
+    addAgentNotification(agent_id, text, ts);
     const agent = AGENTS[agent_id];
-    showToast(`${agent.emoji} ${agent.name}: ${text.slice(0, 60)}${text.length > 60 ? "…" : ""}`);
+    const label = isLong ? "📋 Report ready" : text.slice(0, 60);
+    showToast(`${agent.emoji} ${agent.name}: ${label}`);
   }
 }
 
@@ -422,6 +439,108 @@ function connectSocket() {
 }
 
 
+// ── Notifications on agent sprites ────────────────────────────────────────────
+
+function addAgentNotification(agentId, text, ts) {
+  const spriteEl = document.getElementById(`agent-${agentId}`);
+  if (!spriteEl) return;
+
+  // Remove existing notification
+  const existing = spriteEl.querySelector(".agent-notification");
+  if (existing) existing.remove();
+
+  const badge = document.createElement("div");
+  badge.className = "agent-notification";
+  badge.textContent = "!";
+  badge.title = "New message — click to view";
+  spriteEl.appendChild(badge);
+
+  // Store pending notification
+  state.pendingNotifs[agentId] = { text, ts };
+}
+
+function clearAgentNotification(agentId) {
+  const spriteEl = document.getElementById(`agent-${agentId}`);
+  if (!spriteEl) return;
+  const badge = spriteEl.querySelector(".agent-notification");
+  if (badge) badge.remove();
+  delete state.pendingNotifs[agentId];
+}
+
+// ── Report storage ────────────────────────────────────────────────────────────
+
+function storeReport(agentId, text, ts) {
+  const agent = AGENTS[agentId];
+  state.reports.push({
+    agentId,
+    agentName: agent.name,
+    emoji: agent.emoji,
+    text,
+    ts: ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"}),
+    time: Date.now(),
+  });
+  updateReportsButton();
+}
+
+function updateReportsButton() {
+  if (state.reports.length > 0) {
+    hudReports.classList.remove("hidden");
+    hudReportsCount.textContent = state.reports.length;
+  } else {
+    hudReports.classList.add("hidden");
+  }
+}
+
+// Reports list dropdown
+let reportsListEl = null;
+
+function toggleReportsList() {
+  if (reportsListEl && reportsListEl.classList.contains("open")) {
+    reportsListEl.classList.remove("open");
+    return;
+  }
+
+  if (!reportsListEl) {
+    reportsListEl = document.createElement("div");
+    reportsListEl.id = "reports-list";
+    document.body.appendChild(reportsListEl);
+  }
+
+  let html = '<div class="reports-list-header">📋 Session Reports</div>';
+  for (let i = state.reports.length - 1; i >= 0; i--) {
+    const r = state.reports[i];
+    html += `<div class="report-list-item" data-idx="${i}">
+      <span class="rli-emoji">${r.emoji}</span>${r.agentName}
+      <span class="rli-time">${r.ts}</span>
+    </div>`;
+  }
+
+  reportsListEl.innerHTML = html;
+  reportsListEl.classList.add("open");
+
+  // Click handlers
+  reportsListEl.querySelectorAll(".report-list-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.idx);
+      const r = state.reports[idx];
+      openReportPanel(r.agentId, r.text, r.ts);
+      reportsListEl.classList.remove("open");
+    });
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener("click", function closeList(e) {
+      if (!reportsListEl.contains(e.target) && e.target !== hudReports) {
+        reportsListEl.classList.remove("open");
+        document.removeEventListener("click", closeList);
+      }
+    });
+  }, 10);
+}
+
+hudReports.addEventListener("click", toggleReportsList);
+
 // ── Report panel ──────────────────────────────────────────────────────────────
 
 function openReportPanel(agentId, text, ts) {
@@ -435,6 +554,7 @@ function openReportPanel(agentId, text, ts) {
 
 function closeReportPanel() {
   reportOverlay.classList.add("hidden");
+  dlgOverlay.classList.remove("shifted");
 }
 
 function formatReport(text) {

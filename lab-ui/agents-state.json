@@ -1,7 +1,17 @@
 {
   "scout": {
+    "status": "idle",
+    "detail": "",
+    "updated": "2026-03-06T06:24:53.976317"
+  },
+  "main": {
     "status": "working",
-    "detail": "Processing: ind papers on neural coupling in music\u2026",
-    "updated": "2026-03-06T06:11:46.776776"
+    "detail": "Processing: what are the current project status?\u2026",
+    "updated": "2026-03-06T06:22:27.918812"
+  },
+  "trend": {
+    "status": "idle",
+    "detail": "",
+    "updated": "2026-03-06T06:23:20.294985"
   }
 }
