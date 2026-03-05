@@ -1,715 +1,689 @@
 #!/usr/bin/env python3
 """
-lab-lit-scout — deep on-demand literature search
-Searches PubMed, OpenAlex, arXiv, and Semantic Scholar for a query or hypothesis.
-Scores relevance, generates structured summaries, saves to Obsidian, links to research graph.
-
-Usage:
-  python3 lab_lit_scout.py --query "speech-music neural coupling"
-  python3 lab_lit_scout.py --query "EEG infant speech" --project "infant-hearing-assessment"
-  python3 lab_lit_scout.py --query "auditory brainstem response" --limit 15 --since 2023-01-01
-  python3 lab_lit_scout.py --query "neural coupling ASD" --dry-run
-  python3 lab_lit_scout.py --query "subcortical speech encoding" --sort citations
+lab-lit-scout — On-demand literature search for LabOS
+Searches PubMed, OpenAlex, arXiv. No API keys required.
 """
 
 import argparse
+import hashlib
 import json
-import os
 import re
 import sys
-import subprocess
-import urllib.request
+import time
 import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
 from pathlib import Path
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-WORKSPACE      = Path(os.environ.get("LABOS_WORKSPACE", Path.home() / ".openclaw" / "workspace"))
-LAB_DIR        = WORKSPACE / "LabOS"
-LAB_CONFIG     = LAB_DIR / "LAB_CONFIG.json"
-RESEARCH_GRAPH = LAB_DIR / "research-graph.jsonl"
-XP_FILE        = LAB_DIR / "xp.json"
-XP_ENGINE      = LAB_DIR / "gamification" / "xp_engine.py"
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lab_utils import (
+    load_config, load_graph, save_graph,
+    award_xp, log_session, progress, section_header,
+    checkpoint, confirm, interactive_loop, CheckpointAborted,
+    call_llm, find_project, get_project_hypotheses,
+    upsert_node, now_iso, today_str, short_hash,
+    LAB_DIR,
+)
 
-NOW   = datetime.now(timezone.utc)
-TODAY = NOW.strftime("%Y-%m-%d")
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
-def bold(s):   return f"\033[1m{s}\033[0m"
-def green(s):  return f"\033[32m{s}\033[0m"
-def yellow(s): return f"\033[33m{s}\033[0m"
-def cyan(s):   return f"\033[36m{s}\033[0m"
-def dim(s):    return f"\033[2m{s}\033[0m"
+# ─── HTTP helper ──────────────────────────────────────────────────────────────
 
-def slugify(s):
-    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:60]
-
-def load_json(path):
-    p = Path(path)
-    if p.exists():
-        with open(p) as f:
-            return json.load(f)
-    return None
-
-def save_json(path, data):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-def append_jsonl(path, record):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a") as f:
-        f.write(json.dumps(record) + "\n")
-
-def load_jsonl(path):
-    records = []
-    if Path(path).exists():
-        with open(path) as f:
-            for line in f:
-                try:
-                    records.append(json.loads(line.strip()))
-                except Exception:
-                    pass
-    return records
-
-def http_get(url, timeout=20):
+def http_get(url: str, timeout: int = 10) -> str | None:
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "LabOS/0.1"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode("utf-8")
-    except Exception:
+        req = urllib.request.Request(url, headers={"User-Agent": "LabOS/1.0 (academic research tool)"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
         return None
 
-def award_xp(event, points):
-    data = load_json(XP_FILE) or {"xp": 0, "history": []}
-    data["xp"] = data.get("xp", 0) + points
-    data.setdefault("history", []).append({"event": event, "xp": points, "timestamp": NOW.isoformat()})
-    save_json(XP_FILE, data)
 
-# ── Relevance scoring ──────────────────────────────────────────────────────────
-def score_paper(paper, query_tokens, user_fields):
-    """
-    Score relevance of a paper to the query.
-    Returns float 0.0–1.0
-    """
-    text = " ".join([
-        paper.get("title", "") * 3,   # title weighted 3x
-        paper.get("abstract", ""),
-        paper.get("abstract_snippet", ""),
-        paper.get("journal", "")
-    ]).lower()
+def http_get_json(url: str, timeout: int = 10) -> dict | list | None:
+    raw = http_get(url, timeout)
+    if raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return None
 
-    # Query token overlap
-    query_hits = sum(1 for t in query_tokens if t in text)
-    query_score = min(query_hits / max(len(query_tokens), 1), 1.0)
 
-    # Field relevance bonus
-    field_hits = sum(1 for f in user_fields if f.lower() in text)
-    field_score = min(field_hits / max(len(user_fields), 1), 0.5)
+def slugify(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_-]+", "-", text)
+    return text[:60].strip("-")
 
-    # Recency bonus (papers from last 2 years score higher)
-    year = int(paper.get("year", "2000") or "2000")
-    recency = max(0, min((year - 2020) / 5, 0.3))
 
-    # Open access bonus
-    oa_bonus = 0.05 if paper.get("open_access") else 0
+# ─── PubMed ───────────────────────────────────────────────────────────────────
 
-    score = (query_score * 0.6) + (field_score * 0.25) + recency + oa_bonus
-    return round(min(score, 1.0), 3)
+def search_pubmed(query: str, limit: int, since: str | None) -> list[dict]:
+    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
-# ── PubMed ─────────────────────────────────────────────────────────────────────
-def search_pubmed(query, limit=20, since=None):
-    date_filter = f" AND {since.replace('-', '/')}[PDAT]:{TODAY.replace('-', '/')}[PDAT]" if since else ""
-    params = urllib.parse.urlencode({
-        "db": "pubmed",
-        "term": f"({query}){date_filter}",
-        "retmax": limit,
-        "retmode": "json",
-        "sort": "relevance"
-    })
-    url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?{params}"
-    raw = http_get(url)
-    if not raw:
+    # ESearch
+    params = {"db": "pubmed", "term": query, "retmax": limit * 2,
+              "retmode": "json", "sort": "relevance"}
+    if since:
+        params["mindate"] = since.replace("-", "/")
+        params["datetype"] = "pdat"
+
+    url = f"{base}/esearch.fcgi?{urllib.parse.urlencode(params)}"
+    data = http_get_json(url)
+    if not data:
         return []
-    try:
-        ids = json.loads(raw)["esearchresult"]["idlist"]
-    except Exception:
-        return []
+
+    ids = data.get("esearchresult", {}).get("idlist", [])
     if not ids:
         return []
 
-    fetch_url = (
-        f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?"
-        f"db=pubmed&id={','.join(ids)}&retmode=xml"
-    )
-    xml_raw = http_get(fetch_url)
-    return _parse_pubmed_xml(xml_raw) if xml_raw else []
+    # EFetch
+    fetch_url = f"{base}/efetch.fcgi?db=pubmed&id={','.join(ids)}&retmode=xml"
+    xml_text = http_get(fetch_url)
+    if not xml_text:
+        return []
 
-def _parse_pubmed_xml(xml_raw):
     papers = []
     try:
-        root = ET.fromstring(xml_raw)
-    except Exception:
-        return []
-    for article in root.findall(".//PubmedArticle"):
-        try:
-            pmid = article.findtext(".//PMID", "")
-            title = (article.findtext(".//ArticleTitle", "") or "").strip()
-            abstract_parts = article.findall(".//AbstractText")
-            abstract = " ".join((p.text or "") for p in abstract_parts).strip()
-            authors = []
-            for a in article.findall(".//Author")[:5]:
-                ln = a.findtext("LastName", "")
-                fn = a.findtext("ForeName", "")
-                if ln:
-                    authors.append(f"{ln} {fn[0]}." if fn else ln)
-            year = (article.findtext(".//PubDate/Year") or
-                    (article.findtext(".//PubDate/MedlineDate") or "")[:4] or "")
-            journal = article.findtext(".//Journal/Title", "") or article.findtext(".//MedlineTA", "")
-            doi = ""
-            for id_el in article.findall(".//ArticleId"):
-                if id_el.get("IdType") == "doi":
-                    doi = id_el.text or ""
-            mesh = [m.findtext("DescriptorName", "") for m in article.findall(".//MeshHeading")][:8]
-            papers.append({
-                "source": "pubmed", "pmid": pmid, "title": title,
-                "abstract": abstract, "authors": authors, "year": year,
-                "journal": journal, "doi": doi, "mesh": mesh,
-                "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                "open_access": False
-            })
-        except Exception:
-            continue
+        root = ET.fromstring(xml_text)
+        for article in root.findall(".//PubmedArticle"):
+            try:
+                medline = article.find("MedlineCitation")
+                art     = medline.find("Article")
+                title   = art.findtext("ArticleTitle", "").strip()
+                abstract_el = art.find(".//AbstractText")
+                abstract = abstract_el.text if abstract_el is not None else ""
+
+                # Authors
+                authors = []
+                for auth in art.findall(".//Author"):
+                    last  = auth.findtext("LastName", "")
+                    first = auth.findtext("ForeName", "")
+                    if last:
+                        authors.append(f"{last} {first}".strip())
+
+                # Year
+                year = medline.findtext(".//PubDate/Year") or \
+                       medline.findtext(".//PubDate/MedlineDate", "")[:4]
+
+                # Journal
+                journal = art.findtext(".//Journal/Title", "") or \
+                          art.findtext(".//Journal/ISOAbbreviation", "")
+
+                # DOI
+                doi = ""
+                for aid in article.findall(".//ArticleId"):
+                    if aid.get("IdType") == "doi":
+                        doi = aid.text or ""
+
+                # Citations (not available from PubMed directly, default 0)
+                pmid = medline.findtext("PMID", "")
+
+                papers.append({
+                    "source": "pubmed",
+                    "title": title,
+                    "abstract": abstract or "",
+                    "authors": authors[:3],
+                    "year": year,
+                    "journal": journal,
+                    "doi": doi,
+                    "pmid": pmid,
+                    "citations": 0,
+                    "open_access": False,
+                })
+            except Exception:
+                continue
+    except ET.ParseError:
+        pass
+
     return papers
 
-# ── OpenAlex ───────────────────────────────────────────────────────────────────
-def search_openalex(query, limit=15, since=None, sort="relevance_score"):
-    filters = []
-    if since:
-        filters.append(f"from_publication_date:{since}")
-    filter_str = ",".join(filters) if filters else ""
 
+# ─── OpenAlex ─────────────────────────────────────────────────────────────────
+
+def search_openalex(query: str, limit: int, since: str | None) -> list[dict]:
     params = {
         "search": query,
         "per-page": limit,
-        "sort": f"{sort}:desc",
-        "select": "id,title,authorships,publication_year,primary_location,doi,abstract_inverted_index,open_access,cited_by_count,concepts",
-        "mailto": "labos@research.ai"
+        "sort": "relevance_score:desc",
+        "select": "title,abstract_inverted_index,authorships,publication_year,primary_location,doi,cited_by_count,open_access",
+        "mailto": "labos@example.com",
     }
-    if filter_str:
-        params["filter"] = filter_str
+    if since:
+        params["filter"] = f"publication_year:>{since[:4]}"
 
     url = f"https://api.openalex.org/works?{urllib.parse.urlencode(params)}"
-    raw = http_get(url)
-    if not raw:
-        return []
-    try:
-        results = json.loads(raw).get("results", [])
-    except Exception:
+    data = http_get_json(url)
+    if not data:
         return []
 
     papers = []
-    for r in results:
+    for work in data.get("results", []):
         # Reconstruct abstract from inverted index
         abstract = ""
-        inv = r.get("abstract_inverted_index") or {}
+        inv = work.get("abstract_inverted_index") or {}
         if inv:
-            word_positions = [(pos, word) for word, positions in inv.items() for pos in positions]
+            word_positions = []
+            for word, positions in inv.items():
+                for pos in positions:
+                    word_positions.append((pos, word))
             word_positions.sort()
-            abstract = " ".join(w for _, w in word_positions[:120])
+            abstract = " ".join(w for _, w in word_positions)
 
-        authors = [a.get("author", {}).get("display_name", "") for a in r.get("authorships", [])[:5]]
-        authors = [a for a in authors if a]
+        # Authors
+        authors = []
+        for a in work.get("authorships", [])[:3]:
+            name = a.get("author", {}).get("display_name", "")
+            if name:
+                authors.append(name)
 
-        loc = r.get("primary_location") or {}
-        journal = (loc.get("source") or {}).get("display_name", "")
-        doi = (r.get("doi") or "").replace("https://doi.org/", "")
+        # Journal
+        loc = work.get("primary_location") or {}
+        source = loc.get("source") or {}
+        journal = source.get("display_name", "")
 
-        concepts = [c.get("display_name", "") for c in r.get("concepts", [])[:5]]
+        doi_raw = work.get("doi", "") or ""
+        doi = doi_raw.replace("https://doi.org/", "")
 
         papers.append({
             "source": "openalex",
-            "id": r.get("id", ""),
-            "title": (r.get("title") or "").strip(),
+            "title": work.get("title", ""),
             "abstract": abstract,
             "authors": authors,
-            "year": str(r.get("publication_year", "")),
+            "year": str(work.get("publication_year", "")),
             "journal": journal,
             "doi": doi,
-            "url": r.get("doi") or r.get("id", ""),
-            "open_access": r.get("open_access", {}).get("is_oa", False),
-            "citations": r.get("cited_by_count", 0),
-            "concepts": concepts
+            "pmid": "",
+            "citations": work.get("cited_by_count", 0),
+            "open_access": work.get("open_access", {}).get("is_oa", False),
         })
+
     return papers
 
-# ── arXiv ──────────────────────────────────────────────────────────────────────
-def search_arxiv(query, limit=10, since=None):
-    params = urllib.parse.urlencode({
+
+# ─── arXiv ────────────────────────────────────────────────────────────────────
+
+def search_arxiv(query: str, limit: int, since: str | None) -> list[dict]:
+    params = {
         "search_query": f"all:{query}",
         "start": 0,
         "max_results": limit,
         "sortBy": "relevance",
-        "sortOrder": "descending"
-    })
-    url = f"https://export.arxiv.org/api/query?{params}"
-    raw = http_get(url)
-    if not raw:
+        "sortOrder": "descending",
+    }
+
+    url = f"https://export.arxiv.org/api/query?{urllib.parse.urlencode(params)}"
+    xml_text = http_get(url)
+    if not xml_text:
         return []
 
-    ns = {"atom": "http://www.w3.org/2005/Atom"}
     papers = []
     try:
-        root = ET.fromstring(raw)
-    except Exception:
-        return []
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        root = ET.fromstring(xml_text)
+        for entry in root.findall("atom:entry", ns):
+            title    = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
+            abstract = (entry.findtext("atom:summary", "", ns) or "").strip()
+            published = entry.findtext("atom:published", "", ns)[:10]
+            year     = published[:4] if published else ""
 
-    for entry in root.findall("atom:entry", ns):
-        try:
-            published_str = entry.findtext("atom:published", "", ns)
-            published = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
-            if since:
-                cutoff = datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
-                if published < cutoff:
-                    continue
-            title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
-            abstract = (entry.findtext("atom:summary", "", ns) or "").strip().replace("\n", " ")
-            arxiv_id = (entry.findtext("atom:id", "", ns) or "").split("/abs/")[-1]
-            authors = [a.findtext("atom:name", "", ns) for a in entry.findall("atom:author", ns)[:5]]
-            categories = [c.get("term", "") for c in entry.findall("atom:category", ns)]
+            if since and published < since:
+                continue
+
+            authors = []
+            for auth in entry.findall("atom:author", ns):
+                name = auth.findtext("atom:name", "", ns)
+                if name:
+                    authors.append(name)
+
+            doi = ""
+            arxiv_id = ""
+            for link in entry.findall("atom:link", ns):
+                if link.get("title") == "doi":
+                    doi = link.get("href", "").replace("https://doi.org/", "")
+                if link.get("type") == "text/html":
+                    href = link.get("href", "")
+                    arxiv_id = href.split("/abs/")[-1] if "/abs/" in href else ""
+
             papers.append({
-                "source": "arxiv", "arxiv_id": arxiv_id, "title": title,
-                "abstract": abstract, "authors": authors,
-                "year": str(published.year), "journal": "arXiv",
-                "doi": "", "url": f"https://arxiv.org/abs/{arxiv_id}",
-                "open_access": True, "categories": categories
+                "source": "arxiv",
+                "title": title,
+                "abstract": abstract,
+                "authors": authors[:3],
+                "year": year,
+                "journal": "arXiv",
+                "doi": doi or f"arxiv:{arxiv_id}",
+                "pmid": "",
+                "citations": 0,
+                "open_access": True,
+                "arxiv_id": arxiv_id,
             })
-        except Exception:
-            continue
+    except ET.ParseError:
+        pass
+
     return papers
 
-# ── Semantic Scholar ───────────────────────────────────────────────────────────
-def search_semantic_scholar(query, limit=10, since=None):
-    params = urllib.parse.urlencode({
-        "query": query,
-        "limit": limit,
-        "fields": "title,authors,year,abstract,externalIds,journal,citationCount,openAccessPdf,isOpenAccess,tldr"
-    })
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?{params}"
-    raw = http_get(url)
-    if not raw:
-        return []
-    try:
-        results = json.loads(raw).get("data", [])
-    except Exception:
-        return []
 
-    papers = []
-    for r in results:
-        if since and str(r.get("year", "9999")) < since[:4]:
-            continue
-        authors = [a.get("name", "") for a in r.get("authors", [])[:5]]
-        doi = r.get("externalIds", {}).get("DOI", "")
-        pmid = r.get("externalIds", {}).get("PubMed", "")
-        tldr = (r.get("tldr") or {}).get("text", "")
-        papers.append({
-            "source": "semanticscholar",
-            "ss_id": r.get("paperId", ""),
-            "title": r.get("title", "").strip(),
-            "abstract": r.get("abstract", "") or tldr,
-            "tldr": tldr,
-            "authors": authors,
-            "year": str(r.get("year", "")),
-            "journal": (r.get("journal") or {}).get("name", ""),
-            "doi": doi,
-            "url": f"https://www.semanticscholar.org/paper/{r.get('paperId', '')}",
-            "open_access": r.get("isOpenAccess", False),
-            "citations": r.get("citationCount", 0)
-        })
-    return papers
+# ─── Deduplication & scoring ──────────────────────────────────────────────────
 
-# ── Dedup ──────────────────────────────────────────────────────────────────────
-def dedup(papers):
-    seen = {}
+def dedup(papers: list[dict]) -> list[dict]:
+    seen_dois = set()
+    seen_titles = set()
     result = []
     for p in papers:
-        key = re.sub(r"[^a-z0-9]", "", p["title"].lower())[:50]
-        if key not in seen:
-            seen[key] = True
-            result.append(p)
+        doi = p.get("doi", "").lower().strip()
+        title_key = re.sub(r"\W+", "", p.get("title", "").lower())[:60]
+        if doi and doi in seen_dois:
+            continue
+        if title_key and title_key in seen_titles:
+            continue
+        if doi:
+            seen_dois.add(doi)
+        if title_key:
+            seen_titles.add(title_key)
+        result.append(p)
     return result
 
-# ── Already in library? ────────────────────────────────────────────────────────
-def get_known_dois():
-    records = load_jsonl(RESEARCH_GRAPH)
-    return {r.get("doi", "") for r in records if r.get("type") == "Paper" and r.get("doi")}
 
-# ── Format paper summary ───────────────────────────────────────────────────────
-def format_paper_full(p, rank, style="bullet", known_dois=None):
-    known_dois = known_dois or set()
-    authors = ", ".join(p["authors"][:3])
-    if len(p["authors"]) > 3:
-        authors += " et al."
-    year = p.get("year", "")
-    journal = p.get("journal", p.get("source", ""))
-    url = p.get("url", "")
-    doi = p.get("doi", "")
-    citations = p.get("citations")
-    open_access = p.get("open_access", False)
+def score_paper(paper: dict, query: str, user_fields: list[str]) -> int:
+    query_words = set(query.lower().split())
+    field_words = set(" ".join(user_fields).lower().split())
 
-    source_icon = {"pubmed": "📗", "openalex": "📘", "arxiv": "📙",
-                   "semanticscholar": "📕"}.get(p.get("source", ""), "📄")
-    oa_badge = " 🔓" if open_access else ""
-    already = " ✅" if doi and doi in known_dois else ""
-    cite_str = f" | {citations} citations" if citations else ""
-    tldr = p.get("tldr", "")
+    title    = paper.get("title", "").lower()
+    abstract = paper.get("abstract", "").lower()
 
-    abstract = p.get("abstract", "") or p.get("abstract_snippet", "")
-    abstract_short = abstract[:300] + "..." if len(abstract) > 300 else abstract
+    title_hits    = sum(1 for w in query_words if w in title)
+    abstract_hits = sum(1 for w in query_words if w in abstract)
+    field_hits    = sum(1 for w in field_words if w in title or w in abstract)
 
-    lines = [
-        f"### {rank}. {source_icon}{oa_badge}{already} {p['title']}",
-        f"**{authors}** ({year}) — *{journal}*{cite_str}",
-        f"[🔗 Link]({url})" + (f" | [DOI](https://doi.org/{doi})" if doi else ""),
-        "",
-    ]
-
-    if tldr:
-        lines += [f"**TL;DR:** {tldr}", ""]
-    elif abstract_short:
-        lines += [f"> {abstract_short}", ""]
-
-    # Mesh or concepts as tags
-    tags = p.get("mesh", []) or p.get("concepts", []) or p.get("categories", [])
-    if tags:
-        tag_str = " ".join(f"`{t}`" for t in tags[:5] if t)
-        lines += [f"Tags: {tag_str}", ""]
-
-    return "\n".join(lines)
-
-# ── Contradiction checker ──────────────────────────────────────────────────────
-NEGATION_MARKERS = [
-    "no significant", "not significant", "failed to", "contrary to",
-    "inconsistent with", "challenges the", "contradicts", "refutes",
-    "no evidence", "null result", "negative result", "did not replicate",
-    "lack of", "absence of", "does not support", "no effect",
-    "no difference", "no association", "no correlation", "not associated",
-    "argue against", "questions the", "challenges current"
-]
-
-def check_contradictions(papers, hypotheses):
-    hits = []
-    for p in papers:
-        text = (p.get("title", "") + " " + p.get("abstract", "")).lower()
-        if any(m in text for m in NEGATION_MARKERS):
-            for h in hypotheses:
-                hyp_tokens = set(re.findall(r'\b[a-z]{4,}\b', h["hypothesis"].lower()))
-                paper_tokens = set(re.findall(r'\b[a-z]{4,}\b', text))
-                overlap = hyp_tokens & paper_tokens
-                if len(overlap) >= 2:
-                    hits.append({
-                        "paper": p,
-                        "hypothesis": h["hypothesis"],
-                        "project": h["project"],
-                        "overlap": list(overlap)[:4]
-                    })
-    return hits
-
-# ── Write to Obsidian ──────────────────────────────────────────────────────────
-def save_to_obsidian(cfg, query, papers, report_md):
-    vault = cfg.get("obsidian_vault")
-    if not vault or not Path(vault).exists():
-        return False
-    lit_dir = Path(vault) / "Research" / "Literature"
-    lit_dir.mkdir(parents=True, exist_ok=True)
-    fname = f"{TODAY}-{slugify(query)}.md"
-    (lit_dir / fname).write_text(report_md)
-    print(f"  {green('✓')} Saved: Research/Literature/{fname}")
-    return True
-
-# ── Save to Zotero (basic RIS export) ─────────────────────────────────────────
-def export_ris(papers, path):
-    """Write a .ris file that Zotero can import."""
-    lines = []
-    for p in papers:
-        if not p.get("doi") and not p.get("pmid"):
-            continue
-        lines += [
-            "TY  - JOUR",
-            f"TI  - {p.get('title', '')}",
-        ]
-        for a in p.get("authors", []):
-            lines.append(f"AU  - {a}")
-        if p.get("year"):
-            lines.append(f"PY  - {p['year']}")
-        if p.get("journal"):
-            lines.append(f"JO  - {p['journal']}")
-        if p.get("doi"):
-            lines.append(f"DO  - {p['doi']}")
-        if p.get("url"):
-            lines.append(f"UR  - {p['url']}")
-        if p.get("abstract"):
-            lines.append(f"AB  - {p['abstract'][:500]}")
-        lines.append("ER  - ")
-        lines.append("")
-    Path(path).write_text("\n".join(lines))
-
-# ── Link to project in research graph ─────────────────────────────────────────
-def link_to_project(project_slug, paper_ids):
-    """Append a PaperLink node connecting papers to a project."""
-    for pid in paper_ids:
-        append_jsonl(RESEARCH_GRAPH, {
-            "type": "PaperLink",
-            "project_id": f"proj_{project_slug}",
-            "paper_ref": pid,
-            "linked_by": "lab-lit-scout",
-            "linked_date": TODAY
-        })
-
-# ── Main ───────────────────────────────────────────────────────────────────────
-def run(args):
-    cfg = load_json(LAB_CONFIG)
-    if not cfg:
-        print("❌ No LAB_CONFIG.json found. Run lab-init first.")
-        sys.exit(1)
-
-    query   = args.query
-    limit   = args.limit
-    since   = args.since
-    project = args.project
-    sort_by = args.sort
-    style   = cfg.get("summary_style", "bullet")
-    fields  = cfg.get("fields", [])
-    databases = cfg.get("databases", ["pubmed", "openalex", "arxiv"])
-
-    print(f"\n{bold('🔍 LabOS Literature Scout')}")
-    print(f"{dim(f'Query: {query}')}")
-    if project: print(f"{dim(f'Project: {project}')}")
-    if since:   print(f"{dim(f'Since: {since}')}")
-    print()
-
-    # Query tokenization for scoring
-    query_tokens = set(re.findall(r'\b[a-z]{3,}\b', query.lower()))
-
-    # Search all configured databases
-    all_papers = []
-
-    if "pubmed" in databases:
-        print(f"  Searching PubMed...", end="", flush=True)
-        p = search_pubmed(query, limit=limit * 2, since=since)
-        print(f" {green(str(len(p)))} results")
-        all_papers.extend(p)
-
-    if "openalex" in databases:
-        oa_sort = "cited_by_count" if sort_by == "citations" else "relevance_score"
-        print(f"  Searching OpenAlex...", end="", flush=True)
-        p = search_openalex(query, limit=limit * 2, since=since, sort=oa_sort)
-        print(f" {green(str(len(p)))} results")
-        all_papers.extend(p)
-
-    if "arxiv" in databases:
-        print(f"  Searching arXiv...", end="", flush=True)
-        p = search_arxiv(query, limit=limit, since=since)
-        print(f" {green(str(len(p)))} results")
-        all_papers.extend(p)
-
-    if "semanticscholar" in databases:
-        print(f"  Searching Semantic Scholar...", end="", flush=True)
-        p = search_semantic_scholar(query, limit=limit, since=since)
-        print(f" {green(str(len(p)))} results")
-        all_papers.extend(p)
-
-    all_papers = dedup(all_papers)
-    print(f"\n  {bold(str(len(all_papers)))} unique papers found")
-
-    if not all_papers:
-        print(yellow("\n⚠️  No results. Try a broader query or remove --since."))
-        return
-
-    # Score & sort
-    known_dois = get_known_dois()
-    for p in all_papers:
-        p["_score"] = score_paper(p, query_tokens, fields)
-        p["_known"] = bool(p.get("doi") and p.get("doi") in known_dois)
-
-    if sort_by == "citations":
-        all_papers.sort(key=lambda x: x.get("citations", 0), reverse=True)
-    elif sort_by == "date":
-        all_papers.sort(key=lambda x: x.get("year", "0"), reverse=True)
-    else:
-        all_papers.sort(key=lambda x: x["_score"], reverse=True)
-
-    top_papers = all_papers[:limit]
-
-    # Check hypotheses
-    hypotheses = []
-    for r in load_jsonl(RESEARCH_GRAPH):
-        if r.get("type") == "Project":
-            for h in r.get("hypotheses", []):
-                if h:
-                    hypotheses.append({"project": r["name"], "hypothesis": h})
-
-    contradictions = check_contradictions(top_papers, hypotheses) if hypotheses else []
-
-    # ── Print terminal output ──────────────────────────────────────────────────
-    print(f"\n{'-'*60}")
-    for i, p in enumerate(top_papers, 1):
-        authors_short = (p["authors"][0] + " et al." if len(p["authors"]) > 1
-                         else (p["authors"][0] if p["authors"] else "?"))
-        score_bar = "█" * int(p["_score"] * 10) + "░" * (10 - int(p["_score"] * 10))
-        known_mark = f" {green('✅ in library')}" if p["_known"] else ""
-        oa_mark = " 🔓" if p.get("open_access") else ""
-        cite_str = f" | {p['citations']} cited" if p.get("citations") else ""
-        print(f"\n{bold(f'{i}.')} {p['title'][:72]}{'...' if len(p['title'])>72 else ''}")
-        print(f"   {dim(authors_short + ' · ' + p.get('journal','') + ' · ' + str(p.get('year',''))+ cite_str)}")
-        print(f"   Relevance: {score_bar} {p['_score']:.2f}{oa_mark}{known_mark}")
-        if p.get("tldr"):
-            print(f"   {dim('TL;DR: ' + p['tldr'][:120])}")
-
-    if contradictions:
-        print(f"\n{bold(yellow(f'⚠️  {len(contradictions)} potential contradiction(s) with your hypotheses:'))}")
-        for c in contradictions:
-            print(f"  [{c['project']}] {c['paper']['title'][:70]}...")
-            print(f"  {dim('Hypothesis: ' + c['hypothesis'][:80])}")
-    print(f"{'-'*60}")
-
-    if args.dry_run:
-        print(f"\n{yellow('[dry-run] Skipping save.')}")
-        return
-
-    # ── Build markdown report ──────────────────────────────────────────────────
-    report_lines = [
-        f"# Literature Search: {query}",
-        f"",
-        f"> Date: {TODAY} | {len(top_papers)} papers | Sort: {sort_by}",
-        (f"> Project: `{project}`" if project else ""),
-        f"",
-        f"---",
-        f"",
-    ]
-
-    if contradictions:
-        report_lines += [
-            "## ⚠️ Hypothesis Contradictions",
-            ""
-        ]
-        for c in contradictions:
-            report_lines += [
-                f"**{c['paper']['title']}** may challenge:",
-                f"> {c['hypothesis']}",
-                f"*Shared terms: {', '.join(c['overlap'])}*",
-                ""
-            ]
-        report_lines += ["---", ""]
-
-    report_lines += [f"## Results ({len(top_papers)} papers)", ""]
-    for i, p in enumerate(top_papers, 1):
-        report_lines.append(format_paper_full(p, i, style=style, known_dois=known_dois))
-
-    report_lines += [
-        "---",
-        f"*Generated by LabOS lab-lit-scout · {NOW.strftime('%Y-%m-%d %H:%M UTC')}*"
-    ]
-    report_md = "\n".join(report_lines)
-
-    # ── Save to Obsidian ───────────────────────────────────────────────────────
-    vault = cfg.get("obsidian_vault")
-    query_slug = slugify(query)
-    if vault and Path(vault).exists():
-        lit_dir = Path(vault) / "Research" / "Literature"
-        lit_dir.mkdir(parents=True, exist_ok=True)
-        fname = f"{TODAY}-{query_slug}.md"
-        out_path = lit_dir / fname
-        out_path.write_text(report_md)
-        print(f"\n  {green('✓')} Report saved to Obsidian:")
-        print(f"     {bold(str(out_path))}")
-    else:
-        # Fallback: save to sessions folder
-        fallback = LAB_DIR / "sessions" / f"{TODAY}-{query_slug}.md"
-        fallback.parent.mkdir(parents=True, exist_ok=True)
-        fallback.write_text(report_md)
-        print(f"\n  {yellow('⚠')}  No Obsidian vault configured — saved to:")
-        print(f"     {bold(str(fallback))}")
-        print(f"     Run {cyan('lab-init --update-prefs')} to connect your vault.")
-
-    # ── Interactive Zotero prompt ──────────────────────────────────────────────
-    # Always ask — even if Zotero not configured yet
-    ris_path = LAB_DIR / "sessions" / f"{TODAY}-{query_slug}.ris"
-    ris_path.parent.mkdir(parents=True, exist_ok=True)
-    export_ris(top_papers, ris_path)   # always write RIS so it's ready
-
-    print()
     try:
-        ans = input(f"  {cyan('?')} Import these papers into Zotero? [y/N]: ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        ans = "n"
+        year = int(paper.get("year", 0) or 0)
+        recency = 10 if year >= 2022 else (5 if year >= 2019 else 0)
+    except ValueError:
+        recency = 0
 
-    if ans in ("y", "yes"):
-        if cfg.get("zotero_type") == "web":
-            print(f"\n  {bold('Zotero import steps:')}")
-            print(f"  1. Open Zotero desktop app (or zotero.org)")
-            print(f"  2. File → Import → {bold(str(ris_path))}")
-            print(f"  3. Or drag-drop the .ris file into your library")
-            print(f"\n  {green('✓')} RIS file ready: {ris_path}")
-        elif cfg.get("zotero_type") == "local":
-            print(f"\n  {bold('Zotero import:')}")
-            print(f"  File → Import → {bold(str(ris_path))}")
-            print(f"\n  {green('✓')} RIS file ready: {ris_path}")
-        else:
-            print(f"\n  {yellow('Zotero not connected yet.')}")
-            print(f"  Set it up with: {cyan('python3 lab_init.py --update-prefs')}")
-            print(f"\n  Your .ris file is ready when you do:")
-            print(f"  {bold(str(ris_path))}")
+    cite_score = min(5, (paper.get("citations", 0) or 0) // 20)
+
+    return (
+        min(35, title_hits * 12) +
+        min(35, abstract_hits * 3) +
+        min(15, field_hits * 5) +
+        recency +
+        cite_score
+    )
+
+
+# ─── LLM summarise ────────────────────────────────────────────────────────────
+
+def summarise_papers(papers: list[dict], query: str, hypotheses: list[dict]) -> list[dict]:
+    """Generate structured summaries for each paper via LLM."""
+    hyp_texts = [h.get("text", "") for h in hypotheses if h.get("text")]
+    hyp_block = "\n".join(f"- {h}" for h in hyp_texts) if hyp_texts else "none"
+
+    summarised = []
+    for i, p in enumerate(papers):
+        progress(f"Summarising paper {i+1}/{len(papers)}: {p['title'][:50]}…", "🤖")
+
+        prompt = f"""Analyse this academic paper and respond ONLY as valid JSON (no markdown, no commentary):
+
+Paper:
+Title: {p['title']}
+Abstract: {p['abstract'][:1500]}
+Year: {p['year']} | Journal: {p['journal']}
+
+Query the user is researching: "{query}"
+
+Stored project hypotheses:
+{hyp_block}
+
+Respond with this exact JSON structure:
+{{
+  "key_claim": "one sentence main claim",
+  "method": "study design, sample size if mentioned, key technique",
+  "key_finding": "1-2 sentence finding",
+  "limitation": "one sentence main limitation",
+  "relevance": "one sentence — why this matters for the query",
+  "contradicts_hypothesis": true or false,
+  "contradiction_note": "if true: which hypothesis and why, else empty string"
+}}"""
+
+        raw = call_llm(prompt)
+        try:
+            # Strip markdown code fences if present
+            cleaned = re.sub(r"^```(?:json)?\n?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+            summary = json.loads(cleaned)
+        except (json.JSONDecodeError, ValueError):
+            summary = {
+                "key_claim": "",
+                "method": "",
+                "key_finding": p["abstract"][:200] if p["abstract"] else "No abstract available.",
+                "limitation": "",
+                "relevance": "See abstract.",
+                "contradicts_hypothesis": False,
+                "contradiction_note": "",
+            }
+
+        p.update(summary)
+        summarised.append(p)
+
+    return summarised
+
+
+# ─── Relevance bar ────────────────────────────────────────────────────────────
+
+def relevance_bar(score: int, max_score: int = 100) -> str:
+    filled = round((score / max(max_score, 1)) * 10)
+    return "█" * filled + "░" * (10 - filled) + f" {score}%"
+
+
+# ─── Output ───────────────────────────────────────────────────────────────────
+
+def print_results(papers: list[dict], query: str, project_name: str | None):
+    section_header(f"🔍 Lit Scout — \"{query}\"")
+    if project_name:
+        print(f"   Project: {project_name}")
+    print(f"   {len(papers)} paper(s) found\n")
+
+    for i, p in enumerate(papers, 1):
+        score = p.get("relevance_score", 0)
+        oa    = "🔓" if p.get("open_access") else "🔒"
+        contra = "⚠️  CONTRADICTS HYPOTHESIS" if p.get("contradicts_hypothesis") else ""
+
+        print(f"{'─'*60}")
+        print(f"**{i}. {p['title']}** ({p.get('year', '?')}) {oa}")
+        print(f"   {', '.join(p.get('authors', [])[:3])}")
+        print(f"   Journal: {p.get('journal', '?')} | Citations: {p.get('citations', 0)}")
+        print(f"   Relevance: {relevance_bar(score)}")
+        if p.get("key_claim"):
+            print(f"   🔑 Claim: {p['key_claim']}")
+        if p.get("method"):
+            print(f"   🧪 Method: {p['method']}")
+        if p.get("key_finding"):
+            print(f"   📊 Finding: {p['key_finding']}")
+        if p.get("limitation"):
+            print(f"   ⚠️  Limit: {p['limitation']}")
+        if p.get("relevance"):
+            print(f"   🎯 Why relevant: {p['relevance']}")
+        if p.get("doi"):
+            print(f"   DOI: {p['doi']}")
+        if contra:
+            print(f"\n   🚨 {contra}")
+            if p.get("contradiction_note"):
+                print(f"      {p['contradiction_note']}")
+        print()
+
+
+# ─── Save to Obsidian ─────────────────────────────────────────────────────────
+
+def save_to_obsidian(papers: list[dict], query: str, project_name: str | None, config: dict) -> Path | None:
+    vault = config.get("obsidian_vault", "")
+    if not vault:
+        lit_dir = LAB_DIR / "literature"
     else:
-        print(f"  {dim('Skipped. RIS saved at:')} {dim(str(ris_path))}")
+        lit_dir = Path(vault) / "Research" / "Literature"
+    lit_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Write to research-graph.jsonl ─────────────────────────────────────────
-    paper_refs = []
-    for p in top_papers:
-        ref = p.get("doi") or p.get("pmid") or p.get("arxiv_id") or p.get("ss_id", "")
-        append_jsonl(RESEARCH_GRAPH, {
+    fname = lit_dir / f"{today_str()}-{slugify(query)}.md"
+    lines = [
+        f"# Lit Scout — {query}",
+        f"*{today_str()} | {len(papers)} papers | Project: {project_name or 'global'}*\n",
+        "## Papers\n",
+    ]
+    for i, p in enumerate(papers, 1):
+        oa = "🔓 Open Access" if p.get("open_access") else ""
+        lines += [
+            f"### {i}. {p['title']} ({p.get('year', '?')}) {oa}",
+            f"**Authors:** {', '.join(p.get('authors', []))}  ",
+            f"**Journal:** {p.get('journal', '?')} | **Citations:** {p.get('citations', 0)}  ",
+            f"**DOI:** {p.get('doi', '')}  ",
+            f"**Relevance:** {p.get('relevance_score', 0)}%\n",
+            f"**Key claim:** {p.get('key_claim', '')}  ",
+            f"**Method:** {p.get('method', '')}  ",
+            f"**Finding:** {p.get('key_finding', '')}  ",
+            f"**Limitation:** {p.get('limitation', '')}  ",
+            f"**Why relevant:** {p.get('relevance', '')}\n",
+        ]
+        if p.get("contradicts_hypothesis"):
+            lines.append(f"⚠️ **CONTRADICTS HYPOTHESIS:** {p.get('contradiction_note', '')}\n")
+
+    fname.write_text("\n".join(lines))
+    return fname
+
+
+# ─── Export BibTeX for Zotero ─────────────────────────────────────────────────
+
+def export_bib(papers: list[dict]) -> Path:
+    sessions_dir = LAB_DIR / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    bib_path = sessions_dir / f"{today_str()}-lit-scout.bib"
+
+    entries = []
+    for p in papers:
+        key = short_hash(p.get("doi", p.get("title", "")))
+        authors_str = " and ".join(p.get("authors", ["Unknown"]))
+        entries.append(
+            f"@article{{{key},\n"
+            f"  title = {{{p.get('title', '')}}},\n"
+            f"  author = {{{authors_str}}},\n"
+            f"  year = {{{p.get('year', '')}}},\n"
+            f"  journal = {{{p.get('journal', '')}}},\n"
+            f"  doi = {{{p.get('doi', '')}}},\n"
+            f"}}"
+        )
+    bib_path.write_text("\n\n".join(entries))
+    return bib_path
+
+
+# ─── Research graph ───────────────────────────────────────────────────────────
+
+def papers_to_graph_nodes(papers: list[dict], query: str, project_id: str | None) -> list[dict]:
+    nodes = []
+    for p in papers:
+        pid = f"paper_{short_hash(p.get('doi', '') or p.get('title', ''))}"
+        node = {
             "type": "Paper",
-            "source": p.get("source"),
-            "title": p.get("title"),
-            "authors": p.get("authors"),
-            "year": p.get("year"),
-            "journal": p.get("journal"),
-            "doi": p.get("doi"),
-            "url": p.get("url"),
-            "citations": p.get("citations"),
-            "abstract_snippet": p.get("abstract", "")[:200],
-            "relevance_score": p["_score"],
+            "id": pid,
+            "title": p.get("title", ""),
+            "doi": p.get("doi", ""),
+            "authors": p.get("authors", []),
+            "year": p.get("year", ""),
+            "journal": p.get("journal", ""),
+            "abstract": p.get("abstract", "")[:500],
+            "key_claim": p.get("key_claim", ""),
+            "key_finding": p.get("key_finding", ""),
+            "summary": p.get("key_finding", ""),
+            "relevance_score": p.get("relevance_score", 0),
+            "query": query,
+            "projects": [project_id] if project_id else [],
+            "contradicts": p.get("contradicts_hypothesis", False),
+            "contradiction_note": p.get("contradiction_note", ""),
+            "open_access": p.get("open_access", False),
+            "citations": p.get("citations", 0),
+            "source": p.get("source", ""),
             "added_by": "lab-lit-scout",
-            "added_date": TODAY,
-            "query": query
-        })
-        paper_refs.append(ref)
-    print(f"  {green('✓')} {len(top_papers)} papers written to research-graph.jsonl")
+            "added": now_iso(),
+        }
+        nodes.append(node)
+    return nodes
 
-    # ── Link to project ────────────────────────────────────────────────────────
-    if project:
-        link_to_project(slugify(project), paper_refs)
-        print(f"  {green('✓')} Papers linked to project: {project}")
 
-    # ── XP ─────────────────────────────────────────────────────────────────────
-    award_xp("lit_search_done", 50)
-    print(f"  {green('✓')} +50 XP awarded")
-    print(f"\n{bold(green('✅ Done!'))} {len(top_papers)} papers saved · {len(contradictions)} contradictions flagged\n")
-
+# ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="LabOS deep literature search")
-    parser.add_argument("--query",    required=True,         help="Search query or hypothesis")
-    parser.add_argument("--project",  type=str, default=None, help="Project to link results to")
-    parser.add_argument("--limit",    type=int, default=10,   help="Max papers to return (default 10)")
-    parser.add_argument("--since",    type=str, default=None, help="Filter by date YYYY-MM-DD")
-    parser.add_argument("--sort",     type=str, default="relevance",
-                        choices=["relevance", "citations", "date"],
-                        help="Sort by: relevance (default), citations, date")
-    parser.add_argument("--dry-run",  action="store_true",   help="Print without saving")
+    parser = argparse.ArgumentParser(description="LabOS Lit Scout — literature search")
+    parser.add_argument("--query",   "-q", required=True, help="Search query")
+    parser.add_argument("--project", "-p", help="Project to link papers to")
+    parser.add_argument("--limit",   "-l", type=int, default=10, help="Max papers (1-20)")
+    parser.add_argument("--since",   "-s", help="Filter from date YYYY-MM-DD")
+    parser.add_argument("--sort",    choices=["relevance", "citations", "date"], default="relevance")
+    parser.add_argument("--dry-run", action="store_true", help="Print without saving")
+    parser.add_argument("--no-interactive", action="store_true")
     args = parser.parse_args()
-    run(args)
+
+    args.limit = max(1, min(20, args.limit))
+
+    config = load_config()
+    nodes  = load_graph()
+
+    # Find project
+    project = find_project(nodes, args.project) if args.project else None
+    project_name = None
+    project_id   = None
+    hypotheses   = []
+    if project:
+        props        = project.get("properties", project)
+        project_name = props.get("name", project.get("id", ""))
+        project_id   = project.get("id", "")
+        hypotheses   = get_project_hypotheses(nodes, project_id)
+
+    databases = config.get("databases", ["pubmed", "openalex", "arxiv"])
+    user_fields = config.get("fields", [])
+
+    section_header(f"🔍 Lab Lit Scout — \"{args.query}\"")
+    if project_name:
+        print(f"   Project: {project_name}")
+    print(f"   Databases: {', '.join(databases)} | Limit: {args.limit}")
+    if args.since:
+        print(f"   Since: {args.since}")
+    print()
+
+    # ── Fetch ──
+    all_papers = []
+    per_source = max(args.limit, 8)
+
+    if "pubmed" in databases:
+        progress("Searching PubMed…", "🔬")
+        all_papers += search_pubmed(args.query, per_source, args.since)
+        time.sleep(0.4)  # be nice to NCBI
+
+    if "openalex" in databases:
+        progress("Searching OpenAlex…", "📖")
+        all_papers += search_openalex(args.query, per_source, args.since)
+
+    if "arxiv" in databases:
+        progress("Searching arXiv…", "📄")
+        all_papers += search_arxiv(args.query, per_source, args.since)
+
+    if not all_papers:
+        print("❌ No papers found. Try a broader query.")
+        sys.exit(0)
+
+    # ── Dedup + score ──
+    progress(f"Deduplicating {len(all_papers)} raw results…", "🔀")
+    papers = dedup(all_papers)
+
+    for p in papers:
+        p["relevance_score"] = score_paper(p, args.query, user_fields)
+
+    # Sort
+    if args.sort == "citations":
+        papers.sort(key=lambda p: p.get("citations", 0), reverse=True)
+    elif args.sort == "date":
+        papers.sort(key=lambda p: p.get("year", "0"), reverse=True)
+    else:
+        papers.sort(key=lambda p: p.get("relevance_score", 0), reverse=True)
+
+    papers = papers[:args.limit]
+
+    # ── Checkpoint: show preview before full summarise ──
+    print(f"\n📋 Found {len(papers)} unique papers. Quick preview:")
+    for i, p in enumerate(papers, 1):
+        print(f"  {i}. [{p['relevance_score']:3d}%] {p['title'][:65]} ({p.get('year','?')})")
+
+    if not args.no_interactive:
+        try:
+            choice = checkpoint(
+                "Summarise all with AI, or select specific papers?",
+                options=["all"] + [str(i) for i in range(1, len(papers)+1)] + ["done"],
+                default="all",
+                emoji="🤖",
+            )
+            if choice.lower() == "done":
+                print("Skipping summaries.")
+            elif choice.lower() != "all":
+                # User picked specific indices
+                selected_indices = []
+                for token in re.split(r"[,\s]+", choice):
+                    try:
+                        idx = int(token) - 1
+                        if 0 <= idx < len(papers):
+                            selected_indices.append(idx)
+                    except ValueError:
+                        pass
+                if selected_indices:
+                    papers = [papers[i] for i in selected_indices]
+                    print(f"  Summarising {len(papers)} selected paper(s).")
+        except CheckpointAborted:
+            pass
+
+    # ── Summarise ──
+    progress("Generating AI summaries…", "🤖")
+    papers = summarise_papers(papers, args.query, hypotheses)
+
+    # ── Print results ──
+    print_results(papers, args.query, project_name)
+
+    # ── Contradiction summary ──
+    contradictions = [p for p in papers if p.get("contradicts_hypothesis")]
+    if contradictions:
+        print(f"\n🚨 **{len(contradictions)} paper(s) contradict stored hypotheses:**")
+        for p in contradictions:
+            print(f"   • \"{p['title'][:60]}\"")
+            print(f"     → {p.get('contradiction_note', '')}")
+
+    if args.dry_run:
+        print("\n[DRY RUN] Nothing saved.")
+        return
+
+    # ── Save ──
+    obs_path = save_to_obsidian(papers, args.query, project_name, config)
+    bib_path = export_bib(papers)
+
+    # Update graph
+    new_nodes = papers_to_graph_nodes(papers, args.query, project_id)
+    for n in new_nodes:
+        nodes = upsert_node(nodes, n)
+    save_graph(nodes)
+
+    # Update project's last_lit_scout timestamp
+    if project_id:
+        from lab_utils import update_node
+        nodes = update_node(nodes, project_id, {"last_lit_scout": now_iso()})
+        save_graph(nodes)
+
+    # Session log
+    summary_lines = "\n".join(
+        f"- [{p.get('relevance_score',0)}%] {p['title']} ({p.get('year','?')})"
+        for p in papers
+    )
+    log_session("lab-lit-scout", project_name or "global",
+                f"Query: {args.query}\nPapers found: {len(papers)}\n\n{summary_lines}")
+
+    print(f"\n💾 Obsidian: {obs_path}")
+    print(f"📚 BibTeX:   {bib_path}  (drag into Zotero to import)")
+    print(f"🗂️  Research graph updated — {len(new_nodes)} paper(s) added")
+
+    if not args.no_interactive:
+        try:
+            deep = checkpoint(
+                "Go deeper on any paper? Enter number or 'done'.",
+                options=[str(i) for i in range(1, len(papers)+1)] + ["done"],
+                default="done",
+                emoji="🔎",
+            )
+            if deep.lower() != "done":
+                try:
+                    idx = int(deep) - 1
+                    p = papers[idx]
+                    print(f"\n📄 Full abstract — {p['title']}\n")
+                    print(p.get("abstract", "No abstract available."))
+                    print(f"\nDOI: {p.get('doi', '')}")
+                except (ValueError, IndexError):
+                    pass
+        except CheckpointAborted:
+            pass
+
+    award_xp(50, "🔬 Literature Dive")
+    print("\n✅ Lit scout complete.\n")
+
 
 if __name__ == "__main__":
     main()
