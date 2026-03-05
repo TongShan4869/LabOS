@@ -111,7 +111,7 @@ function buildAgentSprites() {
     const spriteEl = el.querySelector('.agent-sprite-img');
     setInterval(() => {
       frame = (frame + 1) % 4;
-      spriteEl.style.backgroundPositionX = \`\${-frame * 64}px\`;
+      spriteEl.style.backgroundPositionX = `${-frame * 64}px`;
     }, 400);
 
     el.addEventListener("click", () => openDialogue(id));
