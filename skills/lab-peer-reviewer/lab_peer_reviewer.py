@@ -17,6 +17,23 @@ from lab_utils import (
     upsert_node, now_iso, today_str, short_hash, LAB_DIR,
 )
 
+# ── Lab UI state bridge (optional, silent if UI not running) ──────────────────
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent / "lab-ui"))
+    from lab_state import AgentWorking, working, idle as idle_state, error as error_state
+    _UI = True
+except ImportError:
+    class AgentWorking:
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def update(self, *a): pass
+        def __exit__(self, *a): return False
+    def working(*a, **kw): pass
+    def idle_state(*a): pass
+    def error_state(*a): pass
+    _UI = False
+
+
 MODES = ["peer-review", "methods-critique", "pre-submission", "devil's-advocate"]
 
 
@@ -241,4 +258,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with AgentWorking("critic", "Reviewing..."):
+        main()
