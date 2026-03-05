@@ -130,7 +130,7 @@ AGENTS = {
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", "labos-dev-secret")
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # Active agent conversations: {agent_id: {"process": Popen, ...}}
 active_convos: dict = {}
@@ -548,18 +548,41 @@ def _call_main_agent(agent_id: str, text: str) -> str:
     return _run_llm(prompt)
 
 
+def _load_llm_env():
+    """Load LLM config from .env file."""
+    if os.environ.get("LLM_API_KEY"):
+        return
+    env_path = ROOT_DIR.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
 def _run_llm(prompt: str) -> str:
-    """Call claude CLI. Falls back to placeholder if unavailable."""
+    """Call LLM via OpenAI-compatible API."""
+    _load_llm_env()
+    api_key = os.environ.get("LLM_API_KEY", "")
+    if not api_key:
+        return "⚠️ LLM not configured. Set LLM_API_KEY in .env"
+
     try:
-        result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "text"],
-            capture_output=True, text=True, timeout=60
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=api_key,
+            base_url=os.environ.get("LLM_API_BASE", "") or None,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return "I'm thinking... (LLM not available in this context)"
+        resp = client.chat.completions.create(
+            model=os.environ.get("LLM_MODEL", "deepseek-ai/DeepSeek-V3-0324"),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
+            temperature=0.3,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        return f"⚠️ LLM error: {e}"
 
 
 def _set_agent_status(agent_id: str, status: str, detail: str):
@@ -608,4 +631,4 @@ broadcast_thread.start()
 if __name__ == "__main__":
     port = int(os.environ.get("LABOS_UI_PORT", 18792))
     print(f"🔬 LabOS UI running at http://127.0.0.1:{port}")
-    socketio.run(app, host="0.0.0.0", port=port, debug=False)
+    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)

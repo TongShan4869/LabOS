@@ -303,34 +303,49 @@ def interactive_loop(
 
 # ─── LLM call ─────────────────────────────────────────────────────────────────
 
+def _load_llm_env():
+    """Load LLM config from environment or .env files."""
+    if os.environ.get("LLM_API_KEY"):
+        return
+    for env_path in [LAB_DIR / ".env", Path(__file__).parent.parent / ".env"]:
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+            if os.environ.get("LLM_API_KEY"):
+                break
+
+
 def call_llm(prompt: str, model: str | None = None) -> str:
     """
-    Call the LLM via claude CLI. Falls back to manual paste if unavailable.
+    Call the LLM via OpenAI-compatible API (e.g. GMI Cloud, OpenRouter).
+    Config from env: LLM_API_KEY, LLM_API_BASE, LLM_MODEL
     """
-    cmd = ["claude", "-p", prompt, "--output-format", "text"]
-    if model:
-        cmd += ["--model", model]
+    _load_llm_env()
+    api_key = os.environ.get("LLM_API_KEY", "")
+    api_base = os.environ.get("LLM_API_BASE", "")
+    default_model = os.environ.get("LLM_MODEL", "deepseek-ai/DeepSeek-V3-0324")
+
+    if not api_key:
+        print("\n⚠️  No LLM_API_KEY set. Configure .env or environment.")
+        return ""
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-
-    # Fallback: manual paste
-    print("\n" + "─" * 60)
-    print("📋 No LLM CLI found. Paste this prompt into your AI tool:\n")
-    print(prompt)
-    print("─" * 60)
-    print("Paste the response below (end with a line containing only '---END---'):")
-    lines = []
-    while True:
-        line = input()
-        if line.strip() == "---END---":
-            break
-        lines.append(line)
-    return "\n".join(lines)
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url=api_base or None)
+        resp = client.chat.completions.create(
+            model=model or default_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
+            temperature=0.3,
+        )
+        result = resp.choices[0].message.content or ""
+        return result.strip()
+    except Exception as e:
+        print(f"\n⚠️  LLM API error: {e}")
+        return ""
 
 
 # ─── XP ───────────────────────────────────────────────────────────────────────
