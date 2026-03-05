@@ -54,52 +54,58 @@ Pixel art portrait bust shot, super cute kawaii chibi deep sea black lobster sci
 
 ---
 
-# 🧍 SPRITES (In-Lab Clickable Characters)
+# 🎞️ SPRITES (In-Lab Animated Characters)
 
-**Style:** pixel art, super cute chibi kawaii, full body standing pose, hard pixel edges, no anti-aliasing, no shadows  
-**Size:** 32×48 | **Folder:** `assets/sprites/`  
-**Note:** Same lobster species + outfit as each avatar portrait.
+**Style:** pixel art, super cute chibi kawaii, full body, 4-frame sprite sheet side by side  
+**Sheet size:** 128×48 (4 frames × 32×48 each) | **Folder:** `assets/sprites/`  
+**Animation frames:**
+- Frame 0: standing neutral idle
+- Frame 1: slight upward bob (body shifts up ~2px)
+- Frame 2: neutral with tiny expression variation
+- Frame 3: cute character gesture (wave / blink / prop wiggle / antennae bounce)
+
+**Note:** Same lobster species + outfit as each avatar. No gap between frames.
 
 ---
 
 ## sprite-main.png — Classic red American lobster · PI
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii classic red American lobster scientist, big sparkling eyes, chubby round body, white lab coat with tiny heart badge, holding steaming coffee mug, standing idle pose facing viewer slightly, rosy cheeks, adorable boss energy, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi classic red American lobster scientist, white lab coat with tiny heart badge, holding steaming coffee mug. Frame 0: standing neutral idle. Frame 1: slight upward bob. Frame 2: neutral tiny wink. Frame 3: raises coffee mug in a cheerful toast gesture. Rosy cheeks, big sparkling eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-scout.png — Spiny lobster · Literature Scout
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii spiny lobster scientist, big sparkly eyes, long bouncy antennae with star tips, teal green lab coat, holding oversized magnifying glass, standing curious eager pose, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi spiny lobster scientist, teal green lab coat, holding oversized magnifying glass, long antennae with star tips. Frame 0: standing neutral idle. Frame 1: slight upward bob. Frame 2: antennae wiggle outward. Frame 3: peers through magnifying glass with one big curious eye. Rosy cheeks, big sparkling eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-stat.png — Rare blue lobster · Biostatistician
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii rare electric blue lobster scientist, big eyes with round glasses, chubby blue shell, blue lab coat, clutching clipboard with tiny bar chart, standing focused serious pose, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi rare electric blue lobster scientist, blue lab coat, round glasses, holding clipboard with bar chart. Frame 0: standing neutral idle. Frame 1: slight upward bob. Frame 2: adjusts glasses with tiny claw. Frame 3: taps clipboard excitedly, tiny star sparkle appears. Rosy cheeks, big sparkling eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-quill.png — Slipper lobster · Writing Assistant
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii slipper lobster scientist, flat wide shovel-shaped head, big dreamy sparkly eyes, sunshine yellow lab coat with star brooch, holding giant fluffy feather quill pen, standing gentle creative pose, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi slipper lobster scientist, flat shovel-shaped head, sunshine yellow lab coat with star brooch, holding giant feather quill pen. Frame 0: standing neutral idle. Frame 1: slight upward bob. Frame 2: quill pen sways gently side to side. Frame 3: scribbles in the air with quill, tiny hearts float up. Rosy cheeks, big dreamy sparkly eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-sage.png — Langoustine · Research Advisor
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii slim langoustine lobster professor, pale peachy-orange body, big warm eyes with tiny round glasses, purple academic robe with gold trim, tiny tilted mortarboard hat, hands clasped wisely, standing dignified cozy pose, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi slim langoustine lobster professor, pale peachy-orange body, purple academic robe with gold trim, tiny mortarboard hat, round glasses, hands clasped. Frame 0: standing neutral idle dignified. Frame 1: slight upward bob. Frame 2: nods head gently with wise smile. Frame 3: raises one claw thoughtfully with a tiny lightbulb appearing above. Rosy cheeks, big warm sparkly eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-critic.png — Mantis shrimp · Peer Reviewer
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii mantis shrimp scientist, iridescent pastel rainbow shell, big eyes with one skeptical eyebrow raised, orange-red lab coat, brandishing oversized red pen dramatically, standing arms-crossed grumpy-but-cute pose, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi mantis shrimp scientist, iridescent pastel rainbow shell, orange-red lab coat, brandishing oversized red pen, arms crossed. Frame 0: standing arms-crossed grumpy-but-cute idle. Frame 1: slight upward bob. Frame 2: one eyebrow raises higher skeptically. Frame 3: slashes red pen dramatically in the air leaving a red X mark. Rosy cheeks, big round eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-trend.png — Ghost lobster · Field Monitor
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii ghost lobster scientist, pale white-blue translucent chubby round body, big starry sparkly eyes, soft pixel glow aura, orange lab coat with tiny antenna on head, holding microphone excitedly, standing energetic bouncy pose, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi ghost lobster scientist, pale white-blue translucent chubby round body with soft pixel glow aura, orange lab coat, tiny antenna on head, holding microphone. Frame 0: standing energetic idle with slight float. Frame 1: bobs upward with glow brightening. Frame 2: antenna wiggles excitedly. Frame 3: thrusts microphone forward with open excited mouth, tiny music notes float up. Rosy cheeks, big starry sparkly eyes, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ## sprite-warden.png — Deep sea black lobster · Security
 ```
-Pixel art full body chibi sprite, 32x48, super cute kawaii deep sea black lobster scientist, jet black shiny chubby shell, big round eyes with faint red glow, dark navy uniform with gold lock badge on chest, standing arms-crossed vigilant pose, tiny claw saluting, secretly adorable tough expression, rosy cheeks, hard pixel edges only, no anti-aliasing, no shadows, solid flat lime green background RGB 0 255 0, game character sprite, no text
+Pixel art 4-frame sprite sheet, 128x48 total, 4 frames side by side each 32x48, super cute kawaii chibi deep sea black lobster scientist, jet black shiny chubby shell, dark navy uniform with gold lock badge, faint red eye glow. Frame 0: standing vigilant arms-crossed idle. Frame 1: slight upward bob. Frame 2: eyes scan left then right suspiciously. Frame 3: raises claw in sharp salute, gold badge gleams with tiny sparkle. Rosy cheeks, secretly adorable expression, hard pixel edges only, no anti-aliasing, no shadows, no gap between frames, solid flat lime green background RGB 0 255 0, game sprite sheet, no text
 ```
 
 ---
@@ -123,7 +129,7 @@ Pixel art seamless floor tile, 32x32, dark warm stone with subtle grid lines, to
 
 # 🛠️ Processing
 
-Send all images → flood fill bg removal → push to repo.
+Send images → flood fill bg removal → push to repo.
 
 ```bash
 python3 remove_bg.py assets/sprites/ --mode flood   # batch sprites
@@ -131,3 +137,19 @@ python3 remove_bg.py input.png output.png            # single file
 ```
 
 Sprites + avatars → transparent PNG · Lab background → keep original
+
+---
+
+# 🎮 Sprite Animation (JS reference)
+
+Each sprite sheet = 4 frames × 32px wide = 128×48px total.
+
+```js
+// CSS on sprite element:
+// background-image: url(assets/sprites/sprite-scout.png);
+// width: 32px; height: 48px; background-repeat: no-repeat;
+let frame = 0;
+setInterval(() => {
+  sprite.style.backgroundPositionX = `${-(frame++ % 4) * 32}px`;
+}, 300); // 300ms per frame = ~3fps idle animation
+```
