@@ -152,9 +152,15 @@ function openDialogue(agentId) {
 
   state.activeAgent = agentId;
 
-  // Set portrait
-  dlgAvatar.textContent  = agent.emoji;
+  // Set portrait — use PNG if available, fall back to emoji
   dlgAvatar.style.borderColor = agent.color;
+  const avatarImg = new Image();
+  avatarImg.src = `assets/avatars/avatar-${agentId}.png`;
+  avatarImg.alt = agent.name;
+  avatarImg.style.cssText = "width:100%;height:100%;object-fit:contain;image-rendering:pixelated";
+  avatarImg.onerror = () => { dlgAvatar.textContent = agent.emoji; };
+  dlgAvatar.innerHTML = "";
+  dlgAvatar.appendChild(avatarImg);
   dlgNameTag.textContent = agent.name;
   dlgNameTag.style.background = agent.color;
   dlgNameTag.style.color = "#fff";
