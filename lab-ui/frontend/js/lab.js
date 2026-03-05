@@ -61,6 +61,7 @@ const AGENTS = {
 const state = {
   activeAgent:    null,
   typewriterTimer: null,
+  checkpointAgent: null,
   isTyping:       false,
   waitingReply:   false,
   socket:         null,
@@ -209,20 +210,29 @@ function closeDialogue() {
 
 function sendMessage() {
   const text = dlgInput.value.trim();
-  if (!text || state.waitingReply || !state.activeAgent) return;
+  if (!text || !state.activeAgent) return;
 
   const agentId = state.activeAgent;
-  dlgInput.value    = "";
+  dlgInput.value = "";
+
+  if (state.checkpointAgent === agentId) {
+    // Checkpoint reply
+    appendLocalHistory(agentId, "user", text);
+    renderHistory(agentId);
+    dlgInput.disabled = true;
+    dlgInput.placeholder = "Type a message...";
+    state.socket.emit("checkpoint_reply", { agent_id: agentId, text });
+    state.checkpointAgent = null;
+    typewrite(`${AGENTS[agentId].name} is processing...`);
+    return;
+  }
+
+  if (state.waitingReply) return;
   state.waitingReply = true;
 
-  // Show user message in history immediately
   appendLocalHistory(agentId, "user", text);
   renderHistory(agentId);
-
-  // Show "thinking" in dialogue box
   typewrite(`${AGENTS[agentId].name} is thinking...`);
-
-  // Emit to backend
   state.socket.emit("send_message", { agent_id: agentId, text });
 }
 
@@ -245,6 +255,25 @@ function handleAgentReply(data) {
     // Agent is not in focus — show toast
     const agent = AGENTS[agent_id];
     showToast(`${agent.emoji} ${agent.name}: ${text.slice(0, 60)}${text.length > 60 ? "…" : ""}`);
+  }
+}
+
+function handleCheckpoint(data) {
+  const { agent_id, agent_name, prompt, ts } = data;
+
+  appendLocalHistory(agent_id, "agent", `🔀 ${prompt}`, ts);
+
+  if (state.activeAgent === agent_id) {
+    renderHistory(agent_id);
+    typewrite(`🔀 ${prompt}`, () => {
+      dlgInput.disabled = false;
+      dlgInput.placeholder = "Reply to checkpoint...";
+      dlgInput.focus();
+      state.checkpointAgent = agent_id;
+    });
+  } else {
+    const agent = AGENTS[agent_id];
+    showToast(`${agent.emoji} ${agent_name} needs input: ${prompt.slice(0, 80)}`);
   }
 }
 
@@ -352,6 +381,10 @@ function connectSocket() {
 
   socket.on("agent_reply", (data) => {
     handleAgentReply(data);
+  });
+
+  socket.on("checkpoint", (data) => {
+    handleCheckpoint(data);
   });
 
   socket.on("agent_status", (data) => {

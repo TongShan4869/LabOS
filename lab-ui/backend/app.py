@@ -3,6 +3,7 @@
 LabOS UI Backend
 - Serves the pixel lab frontend
 - WebSocket bridge: routes messages between UI and LabOS agents
+- Spawns real skill scripts with checkpoint bridging
 - Reads LabOS state files for live agent status
 """
 
@@ -22,11 +23,15 @@ from flask_socketio import SocketIO, emit
 
 ROOT_DIR     = Path(__file__).parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
+SKILLS_DIR   = ROOT_DIR.parent / "skills"
 LAB_DIR      = Path(os.environ.get("LAB_DIR", Path.home() / ".openclaw/workspace/lab"))
 STATE_FILE   = ROOT_DIR / "state.json"
 AGENTS_FILE  = ROOT_DIR / "agents-state.json"
 XP_FILE      = LAB_DIR / "xp.json"
 MEMORY_DIR   = Path.home() / ".openclaw/workspace/memory"
+
+# Python binary — use the venv if available
+PYTHON_BIN   = os.environ.get("LABOS_PYTHON", sys.executable)
 
 # ─── Agent roster ─────────────────────────────────────────────────────────────
 
@@ -127,9 +132,9 @@ app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", "labos-dev-secret")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
-# Active agent conversations: {agent_id: {"process": Popen, "thread": Thread}}
+# Active agent conversations: {agent_id: {"process": Popen, ...}}
 active_convos: dict = {}
-# Message history per agent: {agent_id: [{"role": "user"|"agent", "text": str, "ts": str}]}
+# Message history per agent
 message_history: dict = {aid: [] for aid in AGENTS}
 
 
@@ -215,9 +220,6 @@ def on_connect():
 
 @socketio.on("send_message")
 def on_message(data):
-    """
-    data = {"agent_id": "scout", "text": "find papers on speech"}
-    """
     agent_id = data.get("agent_id", "main")
     text     = data.get("text", "").strip()
     if not text:
@@ -228,16 +230,13 @@ def on_message(data):
         emit("error", {"message": f"Unknown agent: {agent_id}"})
         return
 
-    # Store user message
     ts = datetime.now().strftime("%H:%M")
     message_history[agent_id].append({"role": "user", "text": text, "ts": ts})
     emit("message_echo", {"agent_id": agent_id, "role": "user", "text": text, "ts": ts})
 
-    # Mark agent as working
     _set_agent_status(agent_id, "working", f"Processing: {text[:40]}…")
     emit("agent_status", {"agent_id": agent_id, "status": "working", "detail": text[:60]})
 
-    # Route message to agent in background thread
     sid = request.sid
     thread = threading.Thread(
         target=_route_to_agent,
@@ -248,45 +247,295 @@ def on_message(data):
 
 
 def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
-    """
-    Routes user message to the appropriate LabOS skill or main agent.
-    Streams response back via WebSocket.
-    """
     skill = agent.get("skill")
-
     if skill is None:
-        # Main agent — call claude directly
         response = _call_main_agent(agent_id, text)
+        _emit_agent_reply(agent_id, agent, response, sid)
     else:
-        # Skill agent — call the Python script with the message as context
-        response = _call_skill_agent(agent_id, skill, text)
+        _run_skill_interactive(agent_id, agent, skill, text, sid)
 
+
+# ─── Skill argument extraction ────────────────────────────────────────────────
+
+SKILL_ARG_SPECS = {
+    "lab-lit-scout": {
+        "script": "lab-lit-scout/lab_lit_scout.py",
+        "required": ["--query"],
+        "extract_prompt": (
+            "Extract arguments for a literature search CLI from this user message.\n"
+            "Available flags: --query/-q (search terms, REQUIRED), --project/-p (project name), "
+            "--limit/-l (max papers 1-20), --since/-s (date YYYY-MM-DD), "
+            "--sort (relevance|citations|date)\n"
+            "Return ONLY a JSON object with keys matching flag names (without --). "
+            'Example: {"query": "speech perception fMRI", "limit": 5}\n'
+            "User message: "
+        ),
+    },
+    "lab-biostat": {
+        "script": "lab-biostat/lab_biostat.py",
+        "required": ["--mode"],
+        "extract_prompt": (
+            "Extract arguments for a biostatistics CLI from this user message.\n"
+            "Available flags: --mode/-m (REQUIRED, one of: design|analyze|interpret|power|review-methods|assumption-check), "
+            "--project/-p (project name), --data/-d (CSV path), --question/-q (research question)\n"
+            'Return ONLY a JSON object. Example: {"mode": "analyze", "data": "/path/to/data.csv"}\n'
+            "User message: "
+        ),
+    },
+    "lab-writing-assistant": {
+        "script": "lab-writing-assistant/lab_writing_assistant.py",
+        "required": ["--section"],
+        "extract_prompt": (
+            "Extract arguments for a writing assistant CLI.\n"
+            "Flags: --section/-s (REQUIRED: intro|abstract|methods|results|discussion|grant-aim|cover-letter|response-to-reviewers), "
+            "--project/-p, --draft/-d, --notes/-n\n"
+            'Return ONLY JSON. Example: {"section": "abstract", "project": "speech-ASD"}\n'
+            "User message: "
+        ),
+    },
+    "lab-research-advisor": {
+        "script": "lab-research-advisor/lab_research_advisor.py",
+        "required": ["--project"],
+        "extract_prompt": (
+            "Extract arguments for a research advisor CLI.\n"
+            "Flags: --project/-p (REQUIRED), --focus/-f (hypothesis|gaps|methods|writing|next-steps)\n"
+            'Return ONLY JSON. Example: {"project": "neural-coupling", "focus": "hypothesis"}\n'
+            "User message: "
+        ),
+    },
+    "lab-peer-reviewer": {
+        "script": "lab-peer-reviewer/lab_peer_reviewer.py",
+        "required": ["--mode"],
+        "extract_prompt": (
+            "Extract arguments for a peer review CLI.\n"
+            "Flags: --mode/-m (REQUIRED: peer-review|methods-critique|pre-submission|devils-advocate), "
+            "--draft/-d, --project/-p\n"
+            'Return ONLY JSON. Example: {"mode": "pre-submission"}\n'
+            "User message: "
+        ),
+    },
+    "lab-field-trend": {
+        "script": "lab-field-trend/lab_field_trend.py",
+        "required": [],
+        "extract_prompt": (
+            "Extract arguments for a field trend CLI.\n"
+            "Flags: --weeks/-w (default 1), --fields/-f (comma-sep)\n"
+            'Return ONLY JSON. Example: {"weeks": 2}\n'
+            "User message: "
+        ),
+    },
+    "lab-security": {
+        "script": "lab-security/lab_security.py",
+        "required": ["--mode"],
+        "extract_prompt": (
+            "Extract arguments for a security audit CLI.\n"
+            "Flags: --mode/-m (REQUIRED: audit|check|classify|preflight), --project/-p, --path\n"
+            'Return ONLY JSON. Example: {"mode": "audit"}\n'
+            "User message: "
+        ),
+    },
+    "lab-publishing-assistant": {
+        "script": "lab-publishing-assistant/lab_publishing_assistant.py",
+        "required": ["--mode"],
+        "extract_prompt": (
+            "Extract arguments for a publishing assistant CLI.\n"
+            "Flags: --mode/-m (REQUIRED: find-journal|reformat|checklist|references|cover-letter), "
+            "--project/-p, --draft/-d, --target-journal/-j\n"
+            'Return ONLY JSON. Example: {"mode": "find-journal", "project": "speech-ASD"}\n'
+            "User message: "
+        ),
+    },
+}
+
+
+def _extract_skill_args(skill: str, user_text: str) -> list[str]:
+    """Use LLM to extract CLI arguments from natural language."""
+    spec = SKILL_ARG_SPECS.get(skill)
+    if not spec:
+        return []
+
+    prompt = spec["extract_prompt"] + user_text + "\nJSON:"
+    raw = _run_llm(prompt)
+
+    try:
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = "\n".join(cleaned.split("\n")[1:])
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+        args_dict = json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError):
+        args_dict = {}
+        if spec["required"]:
+            key = spec["required"][0].lstrip("-")
+            args_dict[key] = user_text
+
+    cli_args = []
+    for key, val in args_dict.items():
+        flag = f"--{key}"
+        if isinstance(val, bool):
+            if val:
+                cli_args.append(flag)
+        elif val is not None:
+            cli_args.append(flag)
+            cli_args.append(str(val))
+
+    return cli_args
+
+
+# ─── Checkpoint bridging ─────────────────────────────────────────────────────
+
+_checkpoint_events: dict = {}
+
+
+@socketio.on("checkpoint_reply")
+def on_checkpoint_reply(data):
+    """User replies to a checkpoint prompt in the UI."""
+    agent_id = data.get("agent_id", "")
+    text = data.get("text", "").strip()
+    entry = _checkpoint_events.get(agent_id)
+    if entry:
+        entry["reply"] = text
+        entry["event"].set()
+
+
+def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, sid: str):
+    """
+    Spawn the real skill script, bridge [CHECKPOINT] prompts through WebSocket,
+    and stream output back as agent replies.
+    """
+    spec = SKILL_ARG_SPECS.get(skill)
+    if not spec:
+        _emit_agent_reply(agent_id, agent,
+                          f"⚠️ Skill `{skill}` not configured for direct execution.", sid)
+        return
+
+    socketio.emit("agent_status", {
+        "agent_id": agent_id, "status": "working",
+        "detail": "Parsing your request…"
+    }, to=sid)
+
+    cli_args = _extract_skill_args(skill, text)
+
+    script_path = SKILLS_DIR / spec["script"]
+    if not script_path.exists():
+        _emit_agent_reply(agent_id, agent,
+                          f"⚠️ Script not found: {script_path}", sid)
+        return
+
+    cmd = [PYTHON_BIN, str(script_path)] + cli_args
+    env = os.environ.copy()
+    env["LAB_DIR"] = str(LAB_DIR)
+    env["LABOS_UI_URL"] = f"http://127.0.0.1:{os.environ.get('LABOS_UI_PORT', '18792')}"
+
+    socketio.emit("agent_status", {
+        "agent_id": agent_id, "status": "working",
+        "detail": f"Running: {agent['name']}…"
+    }, to=sid)
+
+    try:
+        proc = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, env=env,
+            cwd=str(ROOT_DIR.parent),
+        )
+    except Exception as e:
+        _emit_agent_reply(agent_id, agent, f"⚠️ Failed to start: {e}", sid)
+        return
+
+    active_convos[agent_id] = {"process": proc}
+    output_lines = []
+
+    try:
+        for line in iter(proc.stdout.readline, ""):
+            line = line.rstrip("\n")
+
+            if line.startswith("[CHECKPOINT]"):
+                prompt_text = line[len("[CHECKPOINT]"):].strip()
+
+                if output_lines:
+                    _emit_agent_reply(agent_id, agent, "\n".join(output_lines), sid)
+                    output_lines = []
+
+                socketio.emit("checkpoint", {
+                    "agent_id":   agent_id,
+                    "agent_name": agent["name"],
+                    "prompt":     prompt_text,
+                    "ts":         datetime.now().strftime("%H:%M"),
+                }, to=sid)
+
+                event = threading.Event()
+                _checkpoint_events[agent_id] = {"event": event, "reply": ""}
+                event.wait(timeout=300)
+
+                reply = _checkpoint_events.pop(agent_id, {}).get("reply", "")
+                if not reply:
+                    reply = "abort"
+
+                ts = datetime.now().strftime("%H:%M")
+                message_history[agent_id].append({"role": "agent", "text": f"🔀 {prompt_text}", "ts": ts})
+                message_history[agent_id].append({"role": "user", "text": reply, "ts": ts})
+
+                try:
+                    proc.stdin.write(reply + "\n")
+                    proc.stdin.flush()
+                except BrokenPipeError:
+                    break
+
+            elif line.startswith("[NOTIFY:"):
+                msg = line.split("]", 1)[-1].strip() if "]" in line else line
+                _emit_agent_reply(agent_id, agent, msg, sid)
+
+            elif line.strip():
+                output_lines.append(line)
+
+        proc.wait(timeout=120)
+        stderr = proc.stderr.read()
+
+        if output_lines:
+            _emit_agent_reply(agent_id, agent, "\n".join(output_lines), sid)
+
+        if proc.returncode != 0 and stderr.strip():
+            _emit_agent_reply(agent_id, agent,
+                              f"⚠️ Error (exit {proc.returncode}):\n```\n{stderr[:500]}\n```", sid)
+
+    except Exception as e:
+        _emit_agent_reply(agent_id, agent, f"⚠️ Error: {e}", sid)
+        proc.kill()
+    finally:
+        active_convos.pop(agent_id, None)
+        _set_agent_status(agent_id, "idle", "")
+        socketio.emit("agent_status", {
+            "agent_id": agent_id, "status": "idle", "detail": ""
+        }, to=sid)
+
+
+def _emit_agent_reply(agent_id: str, agent: dict, text: str, sid: str):
+    """Emit an agent reply and store in history."""
     ts = datetime.now().strftime("%H:%M")
-    message_history[agent_id].append({"role": "agent", "text": response, "ts": ts,
-                                       "agent_id": agent_id})
-
-    # Emit response with typewriter trigger
+    message_history[agent_id].append({
+        "role": "agent", "text": text, "ts": ts, "agent_id": agent_id
+    })
     socketio.emit("agent_reply", {
         "agent_id":   agent_id,
         "agent_name": agent["name"],
         "avatar":     agent["avatar"],
         "emoji":      agent["emoji"],
         "color":      agent["color"],
-        "text":       response,
+        "text":       text,
         "ts":         ts,
     }, to=sid)
 
-    _set_agent_status(agent_id, "idle", "")
-    socketio.emit("agent_status", {"agent_id": agent_id, "status": "idle", "detail": ""},
-                  to=sid)
 
+# ─── Main agent (PI) ─────────────────────────────────────────────────────────
 
 def _call_main_agent(agent_id: str, text: str) -> str:
     """Call claude CLI as the main 醋の虾 agent."""
-    history = message_history.get(agent_id, [])[-6:]  # last 3 exchanges
+    history = message_history.get(agent_id, [])[-6:]
     history_text = "\n".join(
         f"{'User' if m['role']=='user' else '醋の虾'}: {m['text']}"
-        for m in history[:-1]  # exclude current message
+        for m in history[:-1]
     )
     prompt = (
         "You are 醋の虾 (Cu's Lobster), the PI of a virtual research lab running LabOS. "
@@ -295,31 +544,6 @@ def _call_main_agent(agent_id: str, text: str) -> str:
         "Keep responses concise (2-4 sentences max for dialogue).\n\n"
         + (f"Recent conversation:\n{history_text}\n\n" if history_text else "")
         + f"User: {text}\n醋の虾:"
-    )
-    return _run_llm(prompt)
-
-
-def _call_skill_agent(agent_id: str, skill: str, text: str) -> str:
-    """
-    Route message to a LabOS skill agent.
-    For now: uses LLM with skill context. 
-    Full implementation: spawns skill script and feeds text via stdin.
-    """
-    agent = AGENTS[agent_id]
-    history = message_history.get(agent_id, [])[-6:]
-    history_text = "\n".join(
-        f"{'User' if m['role']=='user' else agent['name']}: {m['text']}"
-        for m in history[:-1]
-    )
-
-    prompt = (
-        f"You are {agent['name']}, a {agent['role']} in a research lab AI system called LabOS. "
-        f"Your skill is {skill}. You help researchers with {agent['role'].lower()} tasks. "
-        f"Be helpful and specific. Keep responses concise for this dialogue interface (2-5 sentences). "
-        f"If the task requires actual execution (running stats, searching papers etc.), "
-        f"acknowledge what you would do and ask for any missing information.\n\n"
-        + (f"Recent:\n{history_text}\n\n" if history_text else "")
-        + f"User: {text}\n{agent['name']}:"
     )
     return _run_llm(prompt)
 
@@ -349,10 +573,6 @@ def _set_agent_status(agent_id: str, status: str, detail: str):
 
 @app.route("/api/push_state", methods=["POST"])
 def push_state():
-    """
-    LabOS skills call this to update their state in the UI.
-    Body: {"agent_id": "scout", "status": "working", "detail": "Searching PubMed..."}
-    """
     data     = request.json or {}
     agent_id = data.get("agent_id", "main")
     status   = data.get("status", "idle")
@@ -361,7 +581,6 @@ def push_state():
     _set_agent_status(agent_id, status, detail)
     socketio.emit("agent_status", {"agent_id": agent_id, "status": status, "detail": detail})
 
-    # Also update main state file
     STATE_FILE.write_text(json.dumps({
         "state":      status,
         "detail":     detail,
