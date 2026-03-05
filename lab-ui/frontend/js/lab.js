@@ -101,7 +101,7 @@ function buildAgentSprites() {
       <div class="agent-status-bubble" id="bubble-${id}"></div>
       <div class="agent-name">${agent.name}</div>
       <div class="agent-sprite-img" id="sprite-img-${id}"
-           style="width:96px;height:144px;background-image:url('assets/sprites/sprite-${id}.png');background-repeat:no-repeat;background-size:384px 144px;background-position:0 0;image-rendering:pixelated;"
+           style="width:96px;height:144px;background-image:url('assets/sprites/sprite-${id}.png');background-repeat:no-repeat;background-size:384px 144px;background-position:0 0;image-rendering:auto;"
            data-frame="0">
       </div>
     `;
