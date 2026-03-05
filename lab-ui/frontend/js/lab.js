@@ -99,11 +99,11 @@ function buildAgentSprites() {
 
     el.innerHTML = `
       <div class="agent-status-bubble" id="bubble-${id}"></div>
+      <div class="agent-name">${agent.name}</div>
       <div class="agent-sprite-img" id="sprite-img-${id}"
-           style="width:64px;height:96px;background-image:url('assets/sprites/sprite-${id}.png');background-repeat:no-repeat;background-size:256px 96px;background-position:0 0;image-rendering:pixelated;"
+           style="width:96px;height:144px;background-image:url('assets/sprites/sprite-${id}.png');background-repeat:no-repeat;background-size:384px 144px;background-position:0 0;image-rendering:pixelated;"
            data-frame="0">
       </div>
-      <div class="agent-name">${agent.name}</div>
     `;
 
     // Start idle animation
@@ -111,7 +111,7 @@ function buildAgentSprites() {
     const spriteEl = el.querySelector('.agent-sprite-img');
     setInterval(() => {
       frame = (frame + 1) % 4;
-      spriteEl.style.backgroundPositionX = `${-frame * 64}px`;
+      spriteEl.style.backgroundPositionX = `${-frame * 96}px`;
     }, 400);
 
     el.addEventListener("click", () => openDialogue(id));
