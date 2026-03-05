@@ -67,7 +67,7 @@ Pixel art portrait bust shot, super cute kawaii chibi mantis shrimp scientist, i
 **Character:** Ghost lobster (pale, glowing) — Field Monitor
 
 ```
-Pixel art portrait bust shot, super cute kawaii chibi ghost lobster scientist, pale white-blue translucent round chubby body, big starry sparkly round eyes, soft glowing pixel aura, rosy cheeks, open excited smile, green lab coat with tiny antenna sticking up, holding a teeny tiny rolled newspaper, energetic adorable expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
+Pixel art portrait bust shot, super cute kawaii chibi ghost lobster scientist, pale white-blue translucent round chubby body, big starry sparkly round eyes, soft glowing pixel aura, rosy cheeks, open excited smile, orange lab coat with tiny antenna sticking up, holding a teeny tiny rolled newspaper, energetic adorable expression, hard pixel edges only, no anti-aliasing, no shadows, no gradients, solid flat lime green background RGB 0 255 0, game sprite style, no text, 110x110
 ```
 
 ---
