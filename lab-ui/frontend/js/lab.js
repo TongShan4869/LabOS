@@ -79,6 +79,12 @@ const dlgNameTag     = $("dialogue-name-tag");
 const dlgInput       = $("dialogue-input");
 const dlgSend        = $("dialogue-send");
 const dlgClose       = $("dialogue-close");
+const reportOverlay  = $("report-overlay");
+const reportEmoji    = $("report-emoji");
+const reportName     = $("report-agent-name");
+const reportTs       = $("report-timestamp");
+const reportBody     = $("report-body");
+const reportClose    = $("report-close");
 const dlgHistory     = $("dialogue-history");
 const hudLevel       = $("hud-level");
 const hudXp          = $("hud-xp");
@@ -244,15 +250,26 @@ function handleAgentReply(data) {
   appendLocalHistory(agent_id, "agent", text, ts);
   state.waitingReply = false;
 
-  // If this agent's dialogue is open, typewrite the reply
-  if (state.activeAgent === agent_id) {
+  const LONG_THRESHOLD = 200;
+
+  if (text.length > LONG_THRESHOLD) {
+    // Long output → open report panel
+    openReportPanel(agent_id, text, ts);
+    // Short summary in dialogue
+    if (state.activeAgent === agent_id) {
+      const summary = text.split("\n").filter(l => l.trim()).slice(0, 2).join(" ").slice(0, 100);
+      typewrite(`📋 Report ready — see panel →  (${summary}…)`, () => {
+        dlgInput.disabled = false;
+        dlgInput.focus();
+      });
+    }
+  } else if (state.activeAgent === agent_id) {
     renderHistory(agent_id);
     typewrite(text, () => {
       dlgInput.disabled = false;
       dlgInput.focus();
     });
   } else {
-    // Agent is not in focus — show toast
     const agent = AGENTS[agent_id];
     showToast(`${agent.emoji} ${agent.name}: ${text.slice(0, 60)}${text.length > 60 ? "…" : ""}`);
   }
@@ -403,6 +420,101 @@ function connectSocket() {
     showToast("⚠️ Cannot reach lab server");
   });
 }
+
+
+// ── Report panel ──────────────────────────────────────────────────────────────
+
+function openReportPanel(agentId, text, ts) {
+  const agent = AGENTS[agentId];
+  reportEmoji.textContent = agent.emoji;
+  reportName.textContent = agent.name + " — " + agent.role;
+  reportTs.textContent = ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"});
+  reportBody.innerHTML = formatReport(text);
+  reportOverlay.classList.remove("hidden");
+}
+
+function closeReportPanel() {
+  reportOverlay.classList.add("hidden");
+}
+
+function formatReport(text) {
+  // Parse the output into structured HTML
+  const lines = text.split("\n");
+  let html = "";
+  let inPaper = false;
+  let paperHtml = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Section headers (═══ lines or lines with lots of ═)
+    if (trimmed.includes("════") || trimmed.includes("────")) {
+      if (inPaper) { html += paperHtml + "</div>"; inPaper = false; paperHtml = ""; }
+      continue;
+    }
+
+    // Title lines (centered, with emoji)
+    if (trimmed.startsWith("🔍") || trimmed.startsWith("📋") || trimmed.startsWith("🤖") ||
+        trimmed.startsWith("📊") || trimmed.startsWith("✍️") || trimmed.startsWith("🎓")) {
+      if (inPaper) { html += paperHtml + "</div>"; inPaper = false; paperHtml = ""; }
+      html += `<div class="report-header-line">${escHtml(trimmed)}</div>`;
+      continue;
+    }
+
+    // Paper entries (numbered: "1. [72%] Title...")
+    const paperMatch = trimmed.match(/^(\d+)\.\s*\[\s*(\d+)%\]\s*(.+)/);
+    if (paperMatch) {
+      if (inPaper) { html += paperHtml + "</div>"; }
+      inPaper = true;
+      paperHtml = `<div class="report-paper">`;
+      paperHtml += `<div class="report-paper-title">${paperMatch[1]}. ${escHtml(paperMatch[3])}</div>`;
+      paperHtml += `<span class="report-stat">Relevance: ${paperMatch[2]}%</span>`;
+      continue;
+    }
+
+    // Progress lines (🔬 Searching..., 📖 Searching...)
+    if (trimmed.startsWith("🔬") || trimmed.startsWith("📖") || trimmed.startsWith("📄") ||
+        trimmed.startsWith("🔀") || trimmed.startsWith("🤖")) {
+      if (inPaper) { html += paperHtml + "</div>"; inPaper = false; paperHtml = ""; }
+      html += `<div class="report-progress">${escHtml(trimmed)}</div>`;
+      continue;
+    }
+
+    // Summary text inside a paper
+    if (inPaper) {
+      if (trimmed.startsWith("Summary:") || trimmed.startsWith("→")) {
+        paperHtml += `<div class="report-paper-summary">${escHtml(trimmed)}</div>`;
+      } else if (trimmed.startsWith("Authors:") || trimmed.startsWith("Year:") ||
+                 trimmed.startsWith("Source:") || trimmed.startsWith("Citations:") ||
+                 trimmed.startsWith("DOI:") || trimmed.startsWith("PMID:")) {
+        paperHtml += `<div class="report-paper-meta">${escHtml(trimmed)}</div>`;
+      } else if (trimmed) {
+        paperHtml += `<div>${escHtml(trimmed)}</div>`;
+      }
+      continue;
+    }
+
+    // Default: plain text line
+    if (trimmed) {
+      html += `<div>${escHtml(trimmed)}</div>`;
+    }
+  }
+
+  if (inPaper) { html += paperHtml + "</div>"; }
+
+  return html || `<div>${escHtml(text)}</div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+reportClose.addEventListener("click", closeReportPanel);
+
+// Click outside report to close
+reportOverlay.addEventListener("click", (e) => {
+  if (e.target === reportOverlay) closeReportPanel();
+});
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 
