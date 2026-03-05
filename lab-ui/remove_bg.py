@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-remove_bg.py — Smart background removal for pixel art
-Two modes:
-  - flood:  edge-connected flood fill (default, safe for characters with bg-colored pixels)
-  - chroma: global green chroma key (fast but can eat interior greens like mantis shrimp)
+remove_bg.py — Smart background removal for pixel art / AI-generated sprites
+
+Modes:
+  flood:  edge-connected flood fill (safe for characters with bg-colored pixels)
+  chroma: global green chroma key
+  smart:  flood fill THEN removes isolated lime-green islands (best for complex cases)
 
 Usage:
-  python3 remove_bg.py input.png [output.png] [--mode flood|chroma] [--tolerance 40]
-  python3 remove_bg.py avatars/                # batch folder, flood mode
+  python3 remove_bg.py input.png [output.png] [--mode flood|chroma|smart] [--tolerance 40]
+  python3 remove_bg.py folder/                # batch, smart mode default
 """
 
 import sys
@@ -29,26 +31,13 @@ def color_distance(c1, c2):
     return sum((int(a) - int(b)) ** 2 for a, b in zip(c1[:3], c2[:3])) ** 0.5
 
 
-def remove_flood(src: Path, dst: Path, tolerance: int = 40):
-    """
-    Flood fill from all 4 edges. Only removes pixels connected to the border
-    that are within `tolerance` color distance of the background color
-    (sampled from the top-left corner).
-    Safe for characters that share colors with the background.
-    """
-    img = Image.open(src).convert("RGBA")
-    w, h = img.size
-    data = np.array(img)
-
-    # Sample background color from corner (most likely pure bg)
-    bg_color = tuple(data[0, 0, :3])
-
-    # Build visited mask via BFS from all edge pixels
+def flood_fill(data, bg_color, tolerance):
+    """BFS flood fill from image edges. Returns boolean mask of pixels to remove."""
+    h, w = data.shape[:2]
     visited = np.zeros((h, w), dtype=bool)
     remove  = np.zeros((h, w), dtype=bool)
     queue   = deque()
 
-    # Seed: all edge pixels
     for x in range(w):
         queue.append((0, x))
         queue.append((h - 1, x))
@@ -58,12 +47,9 @@ def remove_flood(src: Path, dst: Path, tolerance: int = 40):
 
     while queue:
         y, x = queue.popleft()
-        if y < 0 or y >= h or x < 0 or x >= w:
-            continue
-        if visited[y, x]:
+        if y < 0 or y >= h or x < 0 or x >= w or visited[y, x]:
             continue
         visited[y, x] = True
-
         px = tuple(data[y, x, :3])
         if color_distance(px, bg_color) <= tolerance:
             remove[y, x] = True
@@ -72,16 +58,101 @@ def remove_flood(src: Path, dst: Path, tolerance: int = 40):
                 if 0 <= ny < h and 0 <= nx < w and not visited[ny, nx]:
                     queue.append((ny, nx))
 
-    data[remove, 3] = 0
+    return remove
+
+
+def is_lime_green(pixel, tolerance=60):
+    """True if a pixel is 'lime green' background color — bright green, low red+blue."""
+    r, g, b = int(pixel[0]), int(pixel[1]), int(pixel[2])
+    return (
+        g > 160 and          # green channel dominant
+        g - r > tolerance and  # greener than red
+        g - b > tolerance      # greener than blue
+    )
+
+
+def remove_islands(data, tolerance=60):
+    """
+    Find isolated connected regions of lime-green pixels NOT connected to edges,
+    and remove them. Handles interior trapped background like green boxes/halos.
+    """
+    h, w = data.shape[:2]
+    alpha = data[:, :, 3]
+
+    # Build a mask of remaining visible lime-green pixels
+    visible = alpha > 0
+    r = data[:,:,0].astype(int)
+    g = data[:,:,1].astype(int)
+    b = data[:,:,2].astype(int)
+    green_mask = visible & (g > 160) & ((g - r) > tolerance) & ((g - b) > tolerance)
+
+    # Label connected components in green_mask
+    labeled  = np.zeros((h, w), dtype=np.int32)
+    label_id = 0
+    touches_edge = set()
+
+    for sy in range(h):
+        for sx in range(w):
+            if not green_mask[sy, sx] or labeled[sy, sx] != 0:
+                continue
+            label_id += 1
+            queue = deque([(sy, sx)])
+            labeled[sy, sx] = label_id
+            is_edge = False
+            while queue:
+                y, x = queue.popleft()
+                if y == 0 or y == h-1 or x == 0 or x == w-1:
+                    is_edge = True
+                for dy, dx in [(-1,0),(1,0),(0,-1),(0,1)]:
+                    ny, nx = y+dy, x+dx
+                    if 0 <= ny < h and 0 <= nx < w and green_mask[ny, nx] and labeled[ny, nx] == 0:
+                        labeled[ny, nx] = label_id
+                        queue.append((ny, nx))
+            if is_edge:
+                touches_edge.add(label_id)
+
+    # Remove all components NOT touching edges (trapped interior islands)
+    island_mask = (labeled > 0) & ~np.isin(labeled, list(touches_edge))
+    removed = island_mask.sum()
+    data[island_mask, 3] = 0
+    return removed
+
+
+def remove_smart(src: Path, dst: Path, tolerance: int = 45):
+    """Flood fill from edges + remove isolated green islands."""
+    img  = Image.open(src).convert("RGBA")
+    w, h = img.size
+    data = np.array(img)
+
+    bg_color = tuple(data[0, 0, :3])
+
+    # Step 1: flood fill from edges
+    mask = flood_fill(data, bg_color, tolerance)
+    data[mask, 3] = 0
+    edge_removed = mask.sum()
+
+    # Step 2: remove trapped interior green islands
+    island_removed = remove_islands(data, tolerance=50)
+
     result = Image.fromarray(data.astype(np.uint8), "RGBA")
     result.save(dst)
-    removed = remove.sum()
-    print(f"  ✅ {src.name} → {dst.name} ({removed} px removed, flood fill, bg={bg_color})")
+    print(f"  ✅ {src.name} → {dst.name} "
+          f"({edge_removed} edge + {island_removed} island px removed, bg={bg_color})")
+
+
+def remove_flood(src: Path, dst: Path, tolerance: int = 40):
+    img  = Image.open(src).convert("RGBA")
+    data = np.array(img)
+    bg_color = tuple(data[0, 0, :3])
+    mask = flood_fill(data, bg_color, tolerance)
+    data[mask, 3] = 0
+    result = Image.fromarray(data.astype(np.uint8), "RGBA")
+    result.save(dst)
+    print(f"  ✅ {src.name} → {dst.name} ({mask.sum()} px removed, flood fill)")
 
 
 def remove_chroma(src: Path, dst: Path, tolerance: int = 40):
-    """Global green chroma key — fast but can eat interior greens."""
-    img = Image.open(src).convert("RGBA")
+    img  = Image.open(src).convert("RGBA")
     data = np.array(img, dtype=np.int16)
     r, g, b, a = data[:,:,0], data[:,:,1], data[:,:,2], data[:,:,3]
     mask = (g > 180) & (g - r > tolerance) & (g - b > tolerance)
@@ -91,26 +162,25 @@ def remove_chroma(src: Path, dst: Path, tolerance: int = 40):
     print(f"  ✅ {src.name} → {dst.name} ({mask.sum()} px removed, chroma key)")
 
 
-def process(src: Path, dst: Path, mode: str, tolerance: int):
+def process(src, dst, mode, tolerance):
     if mode == "chroma":
         remove_chroma(src, dst, tolerance)
-    else:
+    elif mode == "flood":
         remove_flood(src, dst, tolerance)
+    else:
+        remove_smart(src, dst, tolerance)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("input",  help="Input PNG file or folder")
-    parser.add_argument("output", nargs="?", help="Output PNG (single file mode)")
-    parser.add_argument("--mode", choices=["flood", "chroma"], default="flood",
-                        help="Removal mode (default: flood)")
-    parser.add_argument("--tolerance", type=int, default=40,
-                        help="Color distance tolerance (default: 40)")
+    parser.add_argument("input")
+    parser.add_argument("output", nargs="?")
+    parser.add_argument("--mode", choices=["flood","chroma","smart"], default="smart")
+    parser.add_argument("--tolerance", type=int, default=45)
     args = parser.parse_args()
 
     target = Path(args.input)
-
     if target.is_dir():
         out_dir = target / "transparent"
         out_dir.mkdir(exist_ok=True)
