@@ -10,13 +10,13 @@ const AGENTS = {
     id: "main", name: "醋の虾", role: "Principal Investigator",
     emoji: "🦞", zone: "pi-desk", color: "#e63946",
     greeting: "Hey! What are you working on today?",
-    pos: { left: "80%", top: "33%" },  // PI desk — top right
+    pos: { left: "72%", top: "33%" },  // PI desk — in front of desk
   },
   scout: {
     id: "scout", name: "Scout", role: "Literature Search",
     emoji: "🔬", zone: "bookshelf", color: "#2a9d8f",
     greeting: "Need me to dig into the literature? Just give me a query.",
-    pos: { left: "5%", top: "35%" },   // Bookshelf — far left
+    pos: { left: "13%", top: "35%" },  // Bookshelf — right of shelf
   },
   stat: {
     id: "stat", name: "Stat", role: "Biostatistician",
@@ -34,7 +34,7 @@ const AGENTS = {
     id: "sage", name: "Sage", role: "Research Advisor",
     emoji: "🎓", zone: "advisor-chair", color: "#6d6875",
     greeting: "Let's talk about your research. What's the current hypothesis?",
-    pos: { left: "8%", top: "65%" },   // Armchairs — bottom left
+    pos: { left: "14%", top: "72%" },  // Armchairs — sitting near sofa
   },
   critic: {
     id: "critic", name: "Critic", role: "Peer Reviewer",
@@ -46,7 +46,7 @@ const AGENTS = {
     id: "trend", name: "Trend", role: "Field Monitor",
     emoji: "📰", zone: "news-board", color: "#52b788",
     greeting: "I monitor your field 24/7. Want the latest digest?",
-    pos: { left: "42%", top: "18%" },  // Cork board — TRENDS chart top center
+    pos: { left: "51%", top: "18%" },  // Cork board — under TREVIRS
   },
   warden: {
     id: "warden", name: "Warden", role: "Security",
