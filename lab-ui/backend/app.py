@@ -990,9 +990,14 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     response = _run_llm(messages)
     
     # Check if agent wants to run a skill
-    if "[RUN_SKILL]" in response and skill:
+    has_tool_call = "[RUN_SKILL]" in response or "[TOOL_CALL]" in response
+    if has_tool_call and skill:
         # Agent decided to use its skill — run it
-        clean_response = response.replace("[RUN_SKILL]", "").strip()
+        import re
+        # Strip tool call markers and JSON
+        clean_response = re.sub(r'\[/?TOOL_CALL\].*?(?=\[/TOOL_CALL\]|$)', '', response, flags=re.DOTALL)
+        clean_response = re.sub(r'\[/?TOOL_CALL\]', '', clean_response)
+        clean_response = clean_response.replace("[RUN_SKILL]", "").strip()
         if clean_response:
             _emit_agent_reply(agent_id, agent, clean_response + "\n\n⏳ Running skill...", sid)
         _run_skill_interactive(agent_id, agent, skill, text, sid)
