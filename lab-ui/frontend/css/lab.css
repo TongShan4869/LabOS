@@ -1388,6 +1388,8 @@ body {
 }
 
 /* Modals */
+.modal.hidden { display: none; }
+
 .modal {
   position: fixed;
   top: 0;
