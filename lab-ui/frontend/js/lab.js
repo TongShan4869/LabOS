@@ -169,13 +169,51 @@ function buildAgentSprites() {
 
 function typewrite(text, onDone) {
   clearTimeout(state.typewriterTimer);
+  
+  // Split long text into pages (~4 lines worth, ~280 chars)
+  const PAGE_SIZE = 280;
+  const pages = [];
+  const lines = text.split('\n');
+  let currentPage = '';
+  
+  for (const line of lines) {
+    if (currentPage.length + line.length + 1 > PAGE_SIZE && currentPage.length > 0) {
+      pages.push(currentPage.trim());
+      currentPage = line;
+    } else {
+      currentPage += (currentPage ? '\n' : '') + line;
+    }
+  }
+  if (currentPage.trim()) pages.push(currentPage.trim());
+  
+  // If only one page, no pagination needed
+  if (pages.length <= 1) {
+    _typewritePage(text, onDone);
+    return;
+  }
+  
+  // Store pages for pagination
+  state.pages = pages;
+  state.currentPage = 0;
+  state.pagesDone = onDone;
+  _typewritePage(pages[0], () => {
+    // Show ▼ cursor to indicate more pages
+    dlgCursor.style.display = "block";
+    dlgCursor.textContent = `▼ ${state.currentPage + 1}/${pages.length}`;
+    dlgCursor.classList.add("page-prompt");
+  });
+}
+
+function _typewritePage(text, onDone) {
   state.isTyping = true;
   dlgText.textContent = "";
   dlgCursor.style.display = "block";
+  dlgCursor.textContent = "▼";
+  dlgCursor.classList.remove("page-prompt");
 
   let i = 0;
-  const chars = Array.from(text); // handle emoji properly
-  const speed = 22; // ms per character
+  const chars = Array.from(text);
+  const speed = 18;
 
   function tick() {
     if (i < chars.length) {
@@ -189,14 +227,49 @@ function typewrite(text, onDone) {
   tick();
 }
 
+function advancePage() {
+  if (!state.pages || state.pages.length === 0) return false;
+  
+  state.currentPage++;
+  if (state.currentPage < state.pages.length) {
+    _typewritePage(state.pages[state.currentPage], () => {
+      if (state.currentPage < state.pages.length - 1) {
+        dlgCursor.style.display = "block";
+        dlgCursor.textContent = `▼ ${state.currentPage + 1}/${state.pages.length}`;
+        dlgCursor.classList.add("page-prompt");
+      } else {
+        // Last page done
+        dlgCursor.style.display = "none";
+        state.pages = null;
+        if (state.pagesDone) state.pagesDone();
+      }
+    });
+    return true;
+  }
+  state.pages = null;
+  return false;
+}
+
 function skipTypewriter() {
   if (state.isTyping) {
+    // Skip to end of current page
     clearTimeout(state.typewriterTimer);
     state.isTyping = false;
-    // Show full text immediately
-    const agent = AGENTS[state.activeAgent];
-    // (text is already partially shown; clicking advances)
+    if (state.pages && state.currentPage < state.pages.length) {
+      dlgText.textContent = state.pages[state.currentPage];
+      if (state.currentPage < state.pages.length - 1) {
+        dlgCursor.textContent = `▼ ${state.currentPage + 1}/${state.pages.length}`;
+        dlgCursor.classList.add("page-prompt");
+      } else {
+        dlgCursor.style.display = "none";
+        state.pages = null;
+        if (state.pagesDone) state.pagesDone();
+      }
+    }
+    return;
   }
+  // Not typing — try to advance page
+  if (state.pages && advancePage()) return;
 }
 
 // ── Open dialogue ─────────────────────────────────────────────────────────────
@@ -738,6 +811,7 @@ dlgClose.addEventListener("click", closeDialogue);
 
 // Click dialogue text area to skip typewriter
 dlgText.addEventListener("click", skipTypewriter);
+dlgCursor.addEventListener("click", skipTypewriter);
 
 // Click outside dialogue to close
 dlgOverlay.addEventListener("click", (e) => {

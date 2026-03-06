@@ -221,6 +221,8 @@ body {
   display: flex;
   width: min(800px, 96vw);
   min-height: 130px;
+  max-height: 200px;
+  overflow: hidden;
   background: var(--dlg-bg);
   border: 5px solid var(--dlg-border);
   border-bottom: none;
@@ -1495,4 +1497,17 @@ body {
 .empty-state-icon {
   font-size: 32px;
   margin-bottom: 10px;
+}
+
+/* Page prompt cursor */
+#dialogue-cursor.page-prompt {
+  animation: bounce-cursor 0.8s ease-in-out infinite;
+  cursor: pointer;
+  color: var(--gold);
+  font-size: 10px;
+}
+
+@keyframes bounce-cursor {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
