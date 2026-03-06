@@ -1,33 +1,16 @@
 {
-  "user": "Cu",
-  "career_stage": "postdoc",
-  "fields": [
-    "neuroscience",
-    "speech processing",
-    "auditory neuroscience",
-    "machine learning"
+  "lab_name": "Cu's lab",
+  "integrations": {
+    "obsidian": null,
+    "notion": null,
+    "zotero": false
+  },
+  "projects": [
+    {
+      "name": "Neural Coupling",
+      "field": "neuroimaging",
+      "created": "2026-03-06T08:20:15.954431"
+    }
   ],
-  "disciplines": [
-    "biomedical",
-    "computational"
-  ],
-  "knowledge_store": "obsidian",
-  "obsidian_vault": "/home/admin/obsidian-vault",
-  "notion_research_db": null,
-  "zotero_type": null,
-  "zotero_library_id": null,
-  "databases": [
-    "pubmed",
-    "openalex",
-    "arxiv"
-  ],
-  "writing_style": "concise, methods-forward, active voice, avoid passive",
-  "citation_format": "APA",
-  "summary_style": "bullet",
-  "papers_per_batch": 5,
-  "weekly_trend_day": "Monday",
-  "weekly_trend_time": "08:00",
-  "notify_channel": "discord",
-  "labos_version": "0.1",
-  "created": "2026-03-03T18:58:52.508887"
+  "created_at": "2026-03-06T08:20:15.954445"
 }
