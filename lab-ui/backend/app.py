@@ -1142,13 +1142,56 @@ _checkpoint_events: dict = {}
 
 @socketio.on("checkpoint_reply")
 def on_checkpoint_reply(data):
-    """User replies to a checkpoint prompt in the UI."""
+    """User replies to a checkpoint prompt in the UI. Translates natural language to script format."""
     agent_id = data.get("agent_id", "")
     text = data.get("text", "").strip()
     entry = _checkpoint_events.get(agent_id)
     if entry:
-        entry["reply"] = text
+        # Use LLM to translate natural language to the format the script expects
+        checkpoint_prompt = entry.get("prompt", "")
+        translated = _translate_checkpoint_reply(text, checkpoint_prompt)
+        entry["reply"] = translated
         entry["event"].set()
+
+
+def _translate_checkpoint_reply(user_text: str, checkpoint_prompt: str) -> str:
+    """Translate natural language checkpoint reply into script-expected format."""
+    # Quick pass-through for simple inputs
+    lower = user_text.lower().strip()
+    if lower in ("all", "done", "yes", "no", "y", "n"):
+        return user_text
+    # If it's already just numbers/commas, pass through
+    import re
+    if re.match(r"^[\d,\s]+$", lower):
+        return user_text
+    
+    # Use LLM to translate
+    prompt = f"""The user is replying to this checkpoint prompt from a research tool:
+"{checkpoint_prompt}"
+
+The user said: "{user_text}"
+
+The tool expects one of these formats:
+- "all" to select all items
+- Comma-separated numbers like "1,2,3,4,5" to select specific items
+- A single number like "5" for one item  
+- "done" to finish
+
+Translate the user's intent into the expected format. Reply with ONLY the translated input, nothing else.
+Examples:
+- "summarize the first 5 relevant papers" → "1,2,3,4,5"
+- "give me all of them" → "all"
+- "papers 3, 7, and 10" → "3,7,10"
+- "the top 3" → "1,2,3"
+- "I'm done" → "done"
+"""
+    result = _run_llm(prompt)
+    # Clean up LLM response — extract just the command
+    result = result.strip().strip('"').strip("'").strip()
+    # Validate: if it looks reasonable, use it; otherwise fall back to original
+    if re.match(r"^(all|done|[\d,\s]+)$", result.lower()):
+        return result
+    return user_text
 
 
 def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, sid: str):
@@ -1217,7 +1260,7 @@ def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, si
                 }, to=sid)
 
                 event = threading.Event()
-                _checkpoint_events[agent_id] = {"event": event, "reply": ""}
+                _checkpoint_events[agent_id] = {"event": event, "reply": "", "prompt": prompt_text}
                 event.wait(timeout=300)
 
                 reply = _checkpoint_events.pop(agent_id, {}).get("reply", "")
