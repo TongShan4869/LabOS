@@ -1081,6 +1081,8 @@ body {
 
 /* ─── Filing Cabinet ────────────────────────────────────────────────────────── */
 
+#filing-overlay.hidden { display: none; }
+
 #filing-overlay {
   position: fixed;
   top: 0;
