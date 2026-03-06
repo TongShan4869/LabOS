@@ -109,13 +109,18 @@ def search_pubmed(query: str, limit: int, since: str | None) -> list[dict]:
                 abstract_el = art.find(".//AbstractText")
                 abstract = abstract_el.text if abstract_el is not None else ""
 
-                # Authors
+                # Authors + affiliations
                 authors = []
+                affiliations = []
                 for auth in art.findall(".//Author"):
                     last  = auth.findtext("LastName", "")
                     first = auth.findtext("ForeName", "")
                     if last:
                         authors.append(f"{last} {first}".strip())
+                    for aff in auth.findall(".//AffiliationInfo/Affiliation"):
+                        aff_text = (aff.text or "").strip()
+                        if aff_text and aff_text not in affiliations:
+                            affiliations.append(aff_text)
 
                 # Year
                 year = medline.findtext(".//PubDate/Year") or \
@@ -138,7 +143,8 @@ def search_pubmed(query: str, limit: int, since: str | None) -> list[dict]:
                     "source": "pubmed",
                     "title": title,
                     "abstract": abstract or "",
-                    "authors": authors[:3],
+                    "authors": authors,
+                    "affiliations": affiliations[:3],
                     "year": year,
                     "journal": journal,
                     "doi": doi,
@@ -185,12 +191,18 @@ def search_openalex(query: str, limit: int, since: str | None) -> list[dict]:
             word_positions.sort()
             abstract = " ".join(w for _, w in word_positions)
 
-        # Authors
+        # Authors (all) and corresponding author affiliation
         authors = []
-        for a in work.get("authorships", [])[:3]:
+        affiliations = []
+        for a in work.get("authorships", []):
             name = a.get("author", {}).get("display_name", "")
             if name:
                 authors.append(name)
+            # Grab institution from first authorship entry that has one
+            for inst in a.get("institutions", []):
+                inst_name = inst.get("display_name", "")
+                if inst_name and inst_name not in affiliations:
+                    affiliations.append(inst_name)
 
         # Journal
         loc = work.get("primary_location") or {}
@@ -211,6 +223,7 @@ def search_openalex(query: str, limit: int, since: str | None) -> list[dict]:
             "pmid": "",
             "citations": work.get("cited_by_count", 0),
             "open_access": work.get("open_access", {}).get("is_oa", False),
+            "affiliations": affiliations[:3],
         })
 
     return papers
@@ -394,37 +407,42 @@ def relevance_bar(score: int, max_score: int = 100) -> str:
 # ─── Output ───────────────────────────────────────────────────────────────────
 
 def print_results(papers: list[dict], query: str, project_name: str | None):
-    section_header(f"🔍 Lit Scout — \"{query}\"")
+    print(f"## 🔍 Lit Scout — \"{query}\"")
     if project_name:
-        print(f"   Project: {project_name}")
-    print(f"   {len(papers)} paper(s) found\n")
+        print(f"**Project:** {project_name}")
+    print(f"**{len(papers)} paper(s) found**\n")
 
     for i, p in enumerate(papers, 1):
         score = p.get("relevance_score", 0)
-        oa    = "🔓" if p.get("open_access") else "🔒"
-        contra = "⚠️  CONTRADICTS HYPOTHESIS" if p.get("contradicts_hypothesis") else ""
+        oa    = "🔓 Open Access" if p.get("open_access") else "🔒"
 
-        print(f"{'─'*60}")
-        print(f"**{i}. {p['title']}** ({p.get('year', '?')}) {oa}")
-        print(f"   {', '.join(p.get('authors', [])[:3])}")
-        print(f"   Journal: {p.get('journal', '?')} | Citations: {p.get('citations', 0)}")
-        print(f"   Relevance: {relevance_bar(score)}")
-        if p.get("key_claim"):
-            print(f"   🔑 Claim: {p['key_claim']}")
-        if p.get("method"):
-            print(f"   🧪 Method: {p['method']}")
-        if p.get("key_finding"):
-            print(f"   📊 Finding: {p['key_finding']}")
-        if p.get("limitation"):
-            print(f"   ⚠️  Limit: {p['limitation']}")
-        if p.get("relevance"):
-            print(f"   🎯 Why relevant: {p['relevance']}")
+        print(f"---\n")
+        print(f"### {i}. {p['title']} ({p.get('year', '?')}) {oa}")
+        print(f"**Authors:** {', '.join(p.get('authors', []))}")
+        if p.get("affiliations"):
+            print(f"**Institutions:** {'; '.join(p.get('affiliations', []))}")
+        print(f"**Journal:** {p.get('journal', '?')} | **Citations:** {p.get('citations', 0)} | **Relevance:** {score}%")
         if p.get("doi"):
-            print(f"   DOI: {p['doi']}")
-        if contra:
-            print(f"\n   🚨 {contra}")
+            print(f"**DOI:** [{p['doi']}](https://doi.org/{p['doi']})")
+        # TLDR from abstract
+        abstract = p.get("abstract", "")
+        if abstract:
+            tldr = abstract[:300].rsplit(" ", 1)[0] + ("..." if len(abstract) > 300 else "")
+            print(f"\n> **TLDR:** {tldr}")
+        if p.get("key_claim"):
+            print(f"\n🔑 **Claim:** {p['key_claim']}")
+        if p.get("method"):
+            print(f"🧪 **Method:** {p['method']}")
+        if p.get("key_finding"):
+            print(f"📊 **Finding:** {p['key_finding']}")
+        if p.get("limitation"):
+            print(f"⚠️ **Limitation:** {p['limitation']}")
+        if p.get("relevance"):
+            print(f"🎯 **Why relevant:** {p['relevance']}")
+        if p.get("contradicts_hypothesis"):
+            print(f"\n🚨 **CONTRADICTS HYPOTHESIS**")
             if p.get("contradiction_note"):
-                print(f"      {p['contradiction_note']}")
+                print(f"> {p['contradiction_note']}")
         print()
 
 
