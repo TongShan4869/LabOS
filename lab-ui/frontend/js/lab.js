@@ -62,6 +62,9 @@ const state = {
   activeAgent:    null,
   typewriterTimer: null,
   checkpointAgent: null,
+  filingOpen: false,
+  filingMemoryType: null,
+  activeProjectId: null,
   isTyping:       false,
   waitingReply:   false,
   socket:         null,
@@ -215,39 +218,7 @@ function openDialogue(agentId) {
 
   typewrite(greetText, () => {
     dlgInput.focus();
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   // Scroll history to bottom
   setTimeout(() => { dlgHistory.scrollTop = dlgHistory.scrollHeight; }, 50);
@@ -276,39 +247,7 @@ function sendMessage() {
     renderHistory(agentId);
     dlgInput.disabled = true;
     dlgInput.placeholder = "Type a message...";
-    state.socket.emit("checkpoint_reply", { agent_id: agentId, text 
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+    state.socket.emit("checkpoint_reply", { agent_id: agentId, text });
     state.checkpointAgent = null;
     state.waitingReply = true;
     typewrite(`${AGENTS[agentId].name} is processing your reply...`);
@@ -322,39 +261,7 @@ function sendMessage() {
   appendLocalHistory(agentId, "user", text);
   renderHistory(agentId);
   typewrite(`${AGENTS[agentId].name} is thinking...`);
-  state.socket.emit("send_message", { agent_id: agentId, text 
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+  state.socket.emit("send_message", { agent_id: agentId, text });
 }
 
 // ── Handle agent reply ────────────────────────────────────────────────────────
@@ -382,77 +289,13 @@ function handleAgentReply(data) {
       typewrite(`📋 Report ready — see panel →`, () => {
         dlgInput.disabled = false;
         dlgInput.focus();
-      
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+      });
     } else {
       renderHistory(agent_id);
       typewrite(text, () => {
         dlgInput.disabled = false;
         dlgInput.focus();
-      
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+      });
     }
   } else {
     // Agent not in focus — show notification on sprite
@@ -478,39 +321,7 @@ function handleCheckpoint(data) {
       dlgInput.disabled = false;
       dlgInput.placeholder = "Reply to checkpoint...";
       dlgInput.focus();
-    
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+    });
   } else {
     // Show notification — user needs to click the agent
     addAgentNotification(agent_id, `🔀 ${prompt}`, ts);
@@ -529,39 +340,7 @@ function getLocalHistory(agentId) {
 
 function appendLocalHistory(agentId, role, text, ts) {
   const hist = getLocalHistory(agentId);
-  hist.push({ role, text, ts: ts || new Date().toLocaleTimeString("en", {hour:"2-digit",minute:"2-digit"}) 
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+  hist.push({ role, text, ts: ts || new Date().toLocaleTimeString("en", {hour:"2-digit",minute:"2-digit"}) });
   // Keep last 40 messages
   if (hist.length > 40) hist.splice(0, hist.length - 40);
   sessionStorage.setItem(`history-${agentId}`, JSON.stringify(hist));
@@ -637,76 +416,12 @@ function showToast(msg) {
 
 function connectSocket() {
   const origin = window.location.origin;
-  const socket = io(origin, { transports: ["websocket", "polling"] 
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+  const socket = io(origin, { transports: ["websocket", "polling"] });
   state.socket = socket;
 
   socket.on("connect", () => {
     console.log("🔬 LabOS connected");
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("lab_status", (data) => {
     updateHud(data);
@@ -715,255 +430,31 @@ function connectSocket() {
         updateAgentStatus(id, agentData.status, agentData.detail);
       }
     }
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("agent_reply", (data) => {
     handleAgentReply(data);
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("checkpoint", (data) => {
     handleCheckpoint(data);
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("agent_status", (data) => {
     updateAgentStatus(data.agent_id, data.status, data.detail);
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("message_echo", (data) => {
     // User message confirmed by server — already handled locally
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("disconnect", () => {
     showToast("⚠️ Disconnected from lab server");
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   socket.on("connect_error", () => {
     showToast("⚠️ Cannot reach lab server");
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 }
 
 
@@ -1006,39 +497,7 @@ function storeReport(agentId, text, ts) {
     text,
     ts: ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"}),
     time: Date.now(),
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
   updateReportsButton();
 }
 
@@ -1085,72 +544,8 @@ function toggleReportsList() {
       const r = state.reports[idx];
       openReportPanel(r.agentId, r.text, r.ts);
       reportsListEl.classList.remove("open");
-    
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
+    });
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 
   // Close on outside click
   setTimeout(() => {
@@ -1159,39 +554,7 @@ function toggleReportsList() {
         reportsListEl.classList.remove("open");
         document.removeEventListener("click", closeList);
       }
-    
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+    });
   }, 10);
 }
 
@@ -1203,39 +566,7 @@ function openReportPanel(agentId, text, ts) {
   const agent = AGENTS[agentId];
   reportEmoji.textContent = agent.emoji;
   reportName.textContent = agent.name + " — " + agent.role;
-  reportTs.textContent = ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+  reportTs.textContent = ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"});
   reportBody.innerHTML = formatReport(text);
   reportOverlay.classList.remove("hidden");
 }
@@ -1322,110 +653,14 @@ reportClose.addEventListener("click", closeReportPanel);
 // Click outside report to close
 reportOverlay.addEventListener("click", (e) => {
   if (e.target === reportOverlay) closeReportPanel();
-
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
 });
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 
 function updateClock() {
   const now = new Date();
-  hudTime.textContent = now.toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-  hudDate.textContent = now.toLocaleDateString("en", {weekday:"short", month:"short", day:"numeric"
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+  hudTime.textContent = now.toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"});
+  hudDate.textContent = now.toLocaleDateString("en", {weekday:"short", month:"short", day:"numeric"});
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
@@ -1438,38 +673,6 @@ dlgInput.addEventListener("keydown", (e) => {
     sendMessage();
   }
   if (e.key === "Escape") closeDialogue();
-
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
 });
 
 dlgClose.addEventListener("click", closeDialogue);
@@ -1480,74 +683,10 @@ dlgText.addEventListener("click", skipTypewriter);
 // Click outside dialogue to close
 dlgOverlay.addEventListener("click", (e) => {
   if (e.target === dlgOverlay) closeDialogue();
-
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
 });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeDialogue();
-
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -1562,39 +701,7 @@ function init() {
   fetch("/api/status")
     .then(r => r.json())
     .then(data => updateHud(data))
-    .catch(() => {
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+    .catch(() => {});
 
   // Keyboard shortcut hints
   showToast("🔬 LabOS ready! Click an agent to talk.");
@@ -1621,39 +728,7 @@ function checkOnboardingNeeded() {
       if (!localStorage.getItem('labos_onboarding_complete')) {
         showOnboarding();
       }
-    
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+    });
 }
 
 function showOnboarding() {
@@ -1712,39 +787,7 @@ function finishOnboarding() {
     console.error('Onboarding error:', err);
     alert('Network error. Please check the server.');
     nextOnboardStep(1);
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
   });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 }
 
 function showLoadingScreen(labName) {
@@ -1819,39 +862,7 @@ function showXpModal() {
           el.className = 'xp-badge';
           el.textContent = badge;
           badgesContainer.appendChild(el);
-        
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+        });
       } else {
         badgesContainer.innerHTML = '<span class="xp-badge">🎯 First Steps</span>';
       }
@@ -1867,6 +878,38 @@ function closeXpModal() {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Check if onboarding needed
+
+  // Filing cabinet listeners
+  $('hud-filing').addEventListener('click', showFilingCabinet);
+  $('filing-close').addEventListener('click', closeFilingCabinet);
+  $('filing-overlay').addEventListener('click', (e) => {
+    if (e.target === $('filing-overlay')) closeFilingCabinet();
+  });
+
+  // Filing tabs
+  document.querySelectorAll('.filing-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
+  });
+
+  // New project
+  $('new-project-btn').addEventListener('click', showNewProjectModal);
+  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
+  $('new-project-confirm').addEventListener('click', createNewProject);
+
+  // Add memory
+  document.querySelectorAll('.add-memory-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
+  });
+  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
+  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
+
+  // Memory agent selector
+  if ($('memory-agent-select')) {
+    $('memory-agent-select').addEventListener('change', (e) => {
+      loadAgentMemory(e.target.value);
+    });
+  }
+
   checkOnboardingNeeded();
   
   // XP modal listeners
@@ -1876,78 +919,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === $('xp-modal-overlay')) {
       closeXpModal();
     }
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
   });
 });
 
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-
-// ─── Filing Cabinet ────────────────────────────────────────────────────────
-
-let activeProjectId = null;
-let currentMemoryType = 'agent';
-let currentAgentForMemory = 'main';
+// ─── Filing Cabinet ─────────────────────────────────────────
 
 function showFilingCabinet() {
   $('filing-overlay').classList.remove('hidden');
@@ -1965,15 +940,6 @@ function switchFilingTab(tabName) {
   document.querySelectorAll('.filing-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
   
   // Filing tabs
   document.querySelectorAll('.filing-tab').forEach(btn => {
@@ -2002,15 +968,6 @@ function switchFilingTab(tabName) {
   document.querySelectorAll('.filing-tab-content').forEach(content => {
     content.classList.toggle('active', content.id === `filing-tab-${tabName}`);
   
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
   
   // Filing tabs
   document.querySelectorAll('.filing-tab').forEach(btn => {
@@ -2043,77 +1000,6 @@ function switchFilingTab(tabName) {
   } else if (tabName === 'memory') {
     loadMemory('agent');
   }
-}
-
-// ─── Projects ───────────────────────────────────────────────────────────────
-
-function loadProjects() {
-  fetch('/api/projects')
-    .then(r => r.json())
-    .then(data => {
-      activeProjectId = data.active_project_id;
-      const container = $('projects-list');
-      container.innerHTML = '';
-      
-      if (data.projects.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>No projects yet. Create one to get started!</div>';
-        return;
-      }
-      
-      data.projects.forEach(proj => {
-        const card = document.createElement('div');
-        card.className = 'project-card';
-        if (proj.id === activeProjectId) {
-          card.classList.add('active');
-        }
-        
-        card.innerHTML = `
-          <div class="project-card-name">${escapeHtml(proj.name)}</div>
-          <div class="project-card-field">${escapeHtml(proj.field)}</div>
-          <div class="project-card-stats">
-            <span>📋 ${proj.reports_count} reports</span>
-            <span>💬 ${proj.conversations_count} conversations</span>
-          </div>
-          <div class="project-card-date">Created: ${formatDate(proj.created)}</div>
-        `;
-        
-        card.addEventListener('click', () => activateProject(proj.id));
-        container.appendChild(card);
-      
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-    })
-    .catch(err => console.error('Failed to load projects:', err));
 }
 
 function activateProject(projectId) {
@@ -2169,230 +1055,6 @@ function createNewProject() {
     .catch(err => console.error('Failed to create project:', err));
 }
 
-// ─── Reports ────────────────────────────────────────────────────────────────
-
-function loadReports() {
-  if (!activeProjectId) {
-    $('reports-list').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No active project. Select a project to view reports.</div>';
-    return;
-  }
-  
-  fetch(`/api/projects/${activeProjectId}/reports`)
-    .then(r => r.json())
-    .then(data => {
-      const container = $('reports-list');
-      container.innerHTML = '';
-      
-      if (data.reports.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No reports yet for this project.</div>';
-        return;
-      }
-      
-      // Group by date
-      const grouped = {};
-      data.reports.forEach(report => {
-        const date = report.timestamp.split('T')[0];
-        if (!grouped[date]) grouped[date] = [];
-        grouped[date].push(report);
-      
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-      
-      Object.keys(grouped).sort().reverse().forEach(date => {
-        const dateHeader = document.createElement('div');
-        dateHeader.className = 'report-group-date';
-        dateHeader.textContent = formatDate(date);
-        container.appendChild(dateHeader);
-        
-        grouped[date].forEach(report => {
-          const card = document.createElement('div');
-          card.className = 'report-card';
-          
-          const agent = AGENTS[report.agent_id] || { emoji: '❓', name: 'Unknown' };
-          const preview = report.text.substring(0, 100) + (report.text.length > 100 ? '...' : '');
-          const time = new Date(report.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' 
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-          
-          card.innerHTML = `
-            <div class="report-card-header">
-              <span class="report-card-emoji">${agent.emoji}</span>
-              <span class="report-card-agent">${escapeHtml(agent.name)}</span>
-              <span class="report-card-time">${time}</span>
-            </div>
-            <div class="report-card-preview">${escapeHtml(preview)}</div>
-          `;
-          
-          card.addEventListener('click', () => openReportFromFiling(report));
-          container.appendChild(card);
-        
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-      
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-    })
-    .catch(err => console.error('Failed to load reports:', err));
-}
-
-function openReportFromFiling(report) {
-  const agent = AGENTS[report.agent_id] || { emoji: '❓', name: 'Unknown', color: '#888' };
-  
-  $('report-emoji').textContent = agent.emoji;
-  $('report-agent-name').textContent = agent.name;
-  $('report-agent-name').style.color = agent.color;
-  $('report-timestamp').textContent = new Date(report.timestamp).toLocaleString();
-  
-  const body = $('report-body');
-  body.innerHTML = '';
-  body.style.color = '#2c1810';
-  
-  const pre = document.createElement('pre');
-  pre.textContent = report.text;
-  pre.style.whiteSpace = 'pre-wrap';
-  pre.style.fontFamily = 'monospace';
-  pre.style.fontSize = '13px';
-  pre.style.lineHeight = '1.6';
-  body.appendChild(pre);
-  
-  $('report-overlay').classList.remove('hidden');
-  closeFilingCabinet();
-}
-
-// ─── Memory ─────────────────────────────────────────────────────────────────
-
-function loadMemory(type) {
-  currentMemoryType = type;
-  
-  if (type === 'agent') {
-    loadAgentMemory(currentAgentForMemory);
-  } else if (type === 'project') {
-    loadProjectMemory();
-  } else if (type === 'lab') {
-    loadLabMemory();
-  }
-}
-
 function loadAgentMemory(agentId) {
   currentAgentForMemory = agentId;
   fetch(`/api/agents/${agentId}/memory`)
@@ -2401,81 +1063,6 @@ function loadAgentMemory(agentId) {
       renderMemoryList('agent-memory-list', data.memory);
     })
     .catch(err => console.error('Failed to load agent memory:', err));
-}
-
-function loadProjectMemory() {
-  if (!activeProjectId) {
-    $('project-memory-list').innerHTML = '<div class="empty-state" style="padding:20px 0;font-size:11px;">No active project</div>';
-    return;
-  }
-  
-  fetch(`/api/projects/${activeProjectId}/memory`)
-    .then(r => r.json())
-    .then(data => {
-      renderMemoryList('project-memory-list', data.memory);
-    })
-    .catch(err => console.error('Failed to load project memory:', err));
-}
-
-function loadLabMemory() {
-  fetch('/api/memory')
-    .then(r => r.json())
-    .then(data => {
-      renderMemoryList('lab-memory-list', data.memory);
-    })
-    .catch(err => console.error('Failed to load lab memory:', err));
-}
-
-function renderMemoryList(containerId, entries) {
-  const container = $(containerId);
-  container.innerHTML = '';
-  
-  if (entries.length === 0) {
-    container.innerHTML = '<div class="empty-state" style="padding:20px 0;font-size:11px;">No memories yet</div>';
-    return;
-  }
-  
-  entries.slice().reverse().forEach(entry => {
-    const item = document.createElement('div');
-    item.className = 'memory-item';
-    item.innerHTML = `
-      <div>${escapeHtml(entry.text)}</div>
-      <div class="memory-item-timestamp">${formatDate(entry.timestamp)}</div>
-    `;
-    container.appendChild(item);
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
 }
 
 function showAddMemoryModal(type) {
@@ -2524,25 +1111,39 @@ function saveMemoryNote() {
     .catch(err => console.error('Failed to save memory:', err));
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function formatDate(isoString) {
-  if (!isoString) return 'Unknown';
-  const date = new Date(isoString);
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
-  
-  
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) {
-      closeFilingCabinet();
-    }
-  });
+function loadProjects() {
+  fetch('/api/projects')
+    .then(r => r.json())
+    .then(data => {
+      activeProjectId = data.active_project_id;
+      const container = $('projects-list');
+      container.innerHTML = '';
+      
+      if (data.projects.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>No projects yet. Create one to get started!</div>';
+        return;
+      }
+      
+      data.projects.forEach(proj => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        if (proj.id === activeProjectId) {
+          card.classList.add('active');
+        }
+        
+        card.innerHTML = `
+          <div class="project-card-name">${escapeHtml(proj.name)}</div>
+          <div class="project-card-field">${escapeHtml(proj.field)}</div>
+          <div class="project-card-stats">
+            <span>📋 ${proj.reports_count} reports</span>
+            <span>💬 ${proj.conversations_count} conversations</span>
+          </div>
+          <div class="project-card-date">Created: ${formatDate(proj.created)}</div>
+        `;
+        
+        card.addEventListener('click', () => activateProject(proj.id));
+        container.appendChild(card);
+      
   
   // Filing tabs
   document.querySelectorAll('.filing-tab').forEach(btn => {
@@ -2566,25 +1167,189 @@ function formatDate(isoString) {
     loadAgentMemory(e.target.value);
   });
 });
+    })
+    .catch(err => console.error('Failed to load projects:', err));
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Update fetchStatus to include active project name in HUD
-const originalFetchStatus = fetchStatus;
-fetchStatus = function() {
-  originalFetchStatus();
-  fetch('/api/status')
+function loadReports() {
+  if (!activeProjectId) {
+    $('reports-list').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No active project. Select a project to view reports.</div>';
+    return;
+  }
+  
+  fetch(`/api/projects/${activeProjectId}/reports`)
     .then(r => r.json())
     .then(data => {
-      const projectLabel = $('hud-active-project');
-      if (projectLabel && data.active_project) {
-        projectLabel.textContent = data.active_project;
+      const container = $('reports-list');
+      container.innerHTML = '';
+      
+      if (data.reports.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No reports yet for this project.</div>';
+        return;
       }
+      
+      // Group by date
+      const grouped = {};
+      data.reports.forEach(report => {
+        const date = report.timestamp.split('T')[0];
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(report);
+      
+  
+  // Filing tabs
+  document.querySelectorAll('.filing-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
+  });
+  
+  // New project
+  $('new-project-btn').addEventListener('click', showNewProjectModal);
+  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
+  $('new-project-confirm').addEventListener('click', createNewProject);
+  
+  // Add memory
+  document.querySelectorAll('.add-memory-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
+  });
+  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
+  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
+  
+  // Memory agent selector
+  $('memory-agent-select').addEventListener('change', (e) => {
+    loadAgentMemory(e.target.value);
+  });
+});
+      
+      Object.keys(grouped).sort().reverse().forEach(date => {
+        const dateHeader = document.createElement('div');
+        dateHeader.className = 'report-group-date';
+        dateHeader.textContent = formatDate(date);
+        container.appendChild(dateHeader);
+        
+        grouped[date].forEach(report => {
+          const card = document.createElement('div');
+          card.className = 'report-card';
+          
+          const agent = AGENTS[report.agent_id] || { emoji: '❓', name: 'Unknown' };
+          const preview = report.text.substring(0, 100) + (report.text.length > 100 ? '...' : '');
+          const time = new Date(report.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' 
+  
+  // Filing tabs
+  document.querySelectorAll('.filing-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
+  });
+  
+  // New project
+  $('new-project-btn').addEventListener('click', showNewProjectModal);
+  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
+  $('new-project-confirm').addEventListener('click', createNewProject);
+  
+  // Add memory
+  document.querySelectorAll('.add-memory-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
+  });
+  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
+  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
+  
+  // Memory agent selector
+  $('memory-agent-select').addEventListener('change', (e) => {
+    loadAgentMemory(e.target.value);
+  });
+});
+          
+          card.innerHTML = `
+            <div class="report-card-header">
+              <span class="report-card-emoji">${agent.emoji}</span>
+              <span class="report-card-agent">${escapeHtml(agent.name)}</span>
+              <span class="report-card-time">${time}</span>
+            </div>
+            <div class="report-card-preview">${escapeHtml(preview)}</div>
+          `;
+          
+          card.addEventListener('click', () => openReportFromFiling(report));
+          container.appendChild(card);
+        
+  
+  // Filing tabs
+  document.querySelectorAll('.filing-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
+  });
+  
+  // New project
+  $('new-project-btn').addEventListener('click', showNewProjectModal);
+  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
+  $('new-project-confirm').addEventListener('click', createNewProject);
+  
+  // Add memory
+  document.querySelectorAll('.add-memory-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
+  });
+  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
+  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
+  
+  // Memory agent selector
+  $('memory-agent-select').addEventListener('change', (e) => {
+    loadAgentMemory(e.target.value);
+  });
+});
+      
+  
+  // Filing tabs
+  document.querySelectorAll('.filing-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
+  });
+  
+  // New project
+  $('new-project-btn').addEventListener('click', showNewProjectModal);
+  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
+  $('new-project-confirm').addEventListener('click', createNewProject);
+  
+  // Add memory
+  document.querySelectorAll('.add-memory-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
+  });
+  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
+  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
+  
+  // Memory agent selector
+  $('memory-agent-select').addEventListener('change', (e) => {
+    loadAgentMemory(e.target.value);
+  });
+});
     })
-    .catch(err => console.error('Failed to update active project:', err));
-};
+    .catch(err => console.error('Failed to load reports:', err));
+}
+
+function loadMemory(type) {
+  currentMemoryType = type;
+  
+  if (type === 'agent') {
+    loadAgentMemory(currentAgentForMemory);
+  } else if (type === 'project') {
+    loadProjectMemory();
+  } else if (type === 'lab') {
+    loadLabMemory();
+  }
+}
+
+function loadProjectMemory() {
+  if (!activeProjectId) {
+    $('project-memory-list').innerHTML = '<div class="empty-state" style="padding:20px 0;font-size:11px;">No active project</div>';
+    return;
+  }
+  
+  fetch(`/api/projects/${activeProjectId}/memory`)
+    .then(r => r.json())
+    .then(data => {
+      renderMemoryList('project-memory-list', data.memory);
+    })
+    .catch(err => console.error('Failed to load project memory:', err));
+}
+
+function loadLabMemory() {
+  fetch('/api/memory')
+    .then(r => r.json())
+    .then(data => {
+      renderMemoryList('lab-memory-list', data.memory);
+    })
+    .catch(err => console.error('Failed to load lab memory:', err));
+}
