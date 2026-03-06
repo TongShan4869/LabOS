@@ -328,7 +328,7 @@ function handleAgentReply(data) {
   appendLocalHistory(agent_id, "agent", text, ts);
   state.waitingReply = false;
 
-  const LONG_THRESHOLD = 200;
+  const LONG_THRESHOLD = 1500;
   const isLong = text.length > LONG_THRESHOLD;
 
   // Store report if long
