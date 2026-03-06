@@ -1004,6 +1004,10 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     else:
         # Pure conversational response
         _emit_agent_reply(agent_id, agent, response, sid)
+        # Save long conversational responses as reports too
+        active_proj = _get_active_project_id()
+        if active_proj and len(response) > 500:
+            _save_report(active_proj, agent_id, agent["name"], response)
 
 
 # ─── Skill argument extraction ────────────────────────────────────────────────
@@ -1301,6 +1305,7 @@ def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, si
             active_proj = _get_active_project_id()
             if active_proj and len(final_text) > 200:
                 _save_report(active_proj, agent_id, agent["name"], final_text)
+                print(f"[REPORT] Saved report for {agent_id} ({len(final_text)} chars)")
 
         if proc.returncode != 0 and stderr.strip():
             _emit_agent_reply(agent_id, agent,
