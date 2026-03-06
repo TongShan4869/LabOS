@@ -201,6 +201,30 @@ function skipTypewriter() {
 
 // ── Open dialogue ─────────────────────────────────────────────────────────────
 
+
+// ── Agent animation mode control ──────────────────────────────────────────────
+
+function setAgentAnimMode(agentId, mode, revertMs) {
+  const el = document.getElementById(`agent-${agentId}`);
+  if (!el || !el._anim) return;
+  const anim = el._anim;
+  const prevMode = anim.mode;
+  if (anim.timer) clearInterval(anim.timer);
+  anim.mode = mode;
+  anim.frameIdx = 0;
+  const speeds = { idle: el._animSpeeds[agentId] || 700, clicked: 150, working: 500 };
+  const speed = speeds[mode] || 700;
+  const seqs = el._animSeqs;
+  anim.timer = setInterval(() => {
+    const seq = seqs[mode] || seqs.idle;
+    anim.frameIdx = (anim.frameIdx + 1) % seq.length;
+    anim.el.style.backgroundPositionX = `${-seq[anim.frameIdx] * 96}px`;
+  }, speed);
+  if (revertMs) {
+    setTimeout(() => setAgentAnimMode(agentId, prevMode), revertMs);
+  }
+}
+
 function openDialogue(agentId) {
   const agent = AGENTS[agentId];
   if (!agent) return;
