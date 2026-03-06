@@ -62,9 +62,6 @@ const state = {
   activeAgent:    null,
   typewriterTimer: null,
   checkpointAgent: null,
-  filingOpen: false,
-  filingMemoryType: null,
-  activeProjectId: null,
   isTyping:       false,
   waitingReply:   false,
   socket:         null,
@@ -878,38 +875,6 @@ function closeXpModal() {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Check if onboarding needed
-
-  // Filing cabinet listeners
-  $('hud-filing').addEventListener('click', showFilingCabinet);
-  $('filing-close').addEventListener('click', closeFilingCabinet);
-  $('filing-overlay').addEventListener('click', (e) => {
-    if (e.target === $('filing-overlay')) closeFilingCabinet();
-  });
-
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-
-  // Memory agent selector
-  if ($('memory-agent-select')) {
-    $('memory-agent-select').addEventListener('change', (e) => {
-      loadAgentMemory(e.target.value);
-    });
-  }
-
   checkOnboardingNeeded();
   
   // XP modal listeners
@@ -922,434 +887,275 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ─── Filing Cabinet ─────────────────────────────────────────
+// ─── Filing Cabinet ─────────────────────────────────────────────────────────
+
+const filingState = { open: false, memoryType: null, activeProjectId: null };
+
+function initFilingCabinet() {
+  const el = (id) => document.getElementById(id);
+  
+  el('hud-filing')?.addEventListener('click', showFilingCabinet);
+  el('filing-close')?.addEventListener('click', closeFilingCabinet);
+  el('filing-overlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'filing-overlay') closeFilingCabinet();
+  });
+
+  document.querySelectorAll('.filing-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
+  });
+
+  el('new-project-btn')?.addEventListener('click', showNewProjectModal);
+  el('new-project-cancel')?.addEventListener('click', closeNewProjectModal);
+  el('new-project-confirm')?.addEventListener('click', createNewProject);
+
+  document.querySelectorAll('.add-memory-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
+  });
+  el('memory-note-cancel')?.addEventListener('click', closeAddMemoryModal);
+  el('memory-note-confirm')?.addEventListener('click', saveMemoryNote);
+
+  el('memory-agent-select')?.addEventListener('change', (e) => {
+    loadAgentMemory(e.target.value);
+  });
+}
 
 function showFilingCabinet() {
-  $('filing-overlay').classList.remove('hidden');
+  const overlay = document.getElementById('filing-overlay');
+  if (overlay) { overlay.classList.remove('hidden'); filingState.open = true; }
   loadProjects();
-  loadReports();
-  loadMemory('agent');
 }
 
 function closeFilingCabinet() {
-  $('filing-overlay').classList.add('hidden');
+  const overlay = document.getElementById('filing-overlay');
+  if (overlay) { overlay.classList.add('hidden'); filingState.open = false; }
 }
 
 function switchFilingTab(tabName) {
-  // Update tab buttons
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabName);
-  
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-  
-  // Update tab content
-  document.querySelectorAll('.filing-tab-content').forEach(content => {
-    content.classList.toggle('active', content.id === `filing-tab-${tabName}`);
-  
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-  
-  // Load data for the tab
-  if (tabName === 'projects') {
-    loadProjects();
-  } else if (tabName === 'reports') {
-    loadReports();
-  } else if (tabName === 'memory') {
-    loadMemory('agent');
-  }
-}
+  document.querySelectorAll('.filing-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.filing-tab-content').forEach(c => c.classList.add('hidden'));
+  const tab = document.querySelector(`.filing-tab[data-tab="${tabName}"]`);
+  const content = document.getElementById(`filing-${tabName}`);
+  if (tab) tab.classList.add('active');
+  if (content) content.classList.remove('hidden');
 
-function activateProject(projectId) {
-  fetch(`/api/projects/${projectId}/activate`, { method: 'PUT' })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        activeProjectId = projectId;
-        loadProjects();
-        loadReports();
-        showToast('Project activated! 📂', 'success');
-        // Reload status to update HUD
-        fetchStatus();
-      }
-    })
-    .catch(err => console.error('Failed to activate project:', err));
-}
-
-function showNewProjectModal() {
-  $('new-project-modal').classList.remove('hidden');
-  $('new-project-name').value = '';
-  $('new-project-field').value = '';
-  $('new-project-desc').value = '';
-}
-
-function closeNewProjectModal() {
-  $('new-project-modal').classList.add('hidden');
-}
-
-function createNewProject() {
-  const name = $('new-project-name').value.trim();
-  const field = $('new-project-field').value.trim();
-  const description = $('new-project-desc').value.trim();
-  
-  if (!name) {
-    showToast('Please enter a project name', 'error');
-    return;
-  }
-  
-  fetch('/api/projects', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, field, description })
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        closeNewProjectModal();
-        loadProjects();
-        showToast('Project created! 🎉', 'success');
-      }
-    })
-    .catch(err => console.error('Failed to create project:', err));
-}
-
-function loadAgentMemory(agentId) {
-  currentAgentForMemory = agentId;
-  fetch(`/api/agents/${agentId}/memory`)
-    .then(r => r.json())
-    .then(data => {
-      renderMemoryList('agent-memory-list', data.memory);
-    })
-    .catch(err => console.error('Failed to load agent memory:', err));
-}
-
-function showAddMemoryModal(type) {
-  currentMemoryType = type;
-  $('add-memory-modal').classList.remove('hidden');
-  $('memory-note-text').value = '';
-}
-
-function closeAddMemoryModal() {
-  $('add-memory-modal').classList.add('hidden');
-}
-
-function saveMemoryNote() {
-  const text = $('memory-note-text').value.trim();
-  if (!text) {
-    showToast('Please enter a note', 'error');
-    return;
-  }
-  
-  let url = '';
-  if (currentMemoryType === 'agent') {
-    url = `/api/agents/${currentAgentForMemory}/memory`;
-  } else if (currentMemoryType === 'project') {
-    if (!activeProjectId) {
-      showToast('No active project', 'error');
-      return;
-    }
-    url = `/api/projects/${activeProjectId}/memory`;
-  } else if (currentMemoryType === 'lab') {
-    url = '/api/memory';
-  }
-  
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        closeAddMemoryModal();
-        loadMemory(currentMemoryType);
-        showToast('Memory saved! 🧠', 'success');
-      }
-    })
-    .catch(err => console.error('Failed to save memory:', err));
+  if (tabName === 'projects') loadProjects();
+  else if (tabName === 'reports') loadReports();
+  else if (tabName === 'memory') loadMemory();
 }
 
 function loadProjects() {
   fetch('/api/projects')
     .then(r => r.json())
     .then(data => {
-      activeProjectId = data.active_project_id;
-      const container = $('projects-list');
-      container.innerHTML = '';
+      filingState.activeProjectId = data.active_project_id;
+      const container = document.getElementById('projects-list');
+      if (!container) return;
       
-      if (data.projects.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>No projects yet. Create one to get started!</div>';
+      if (!data.projects || data.projects.length === 0) {
+        container.innerHTML = '<div class="filing-empty">No projects yet. Create one!</div>';
         return;
       }
       
-      data.projects.forEach(proj => {
-        const card = document.createElement('div');
-        card.className = 'project-card';
-        if (proj.id === activeProjectId) {
-          card.classList.add('active');
-        }
-        
-        card.innerHTML = `
-          <div class="project-card-name">${escapeHtml(proj.name)}</div>
-          <div class="project-card-field">${escapeHtml(proj.field)}</div>
-          <div class="project-card-stats">
-            <span>📋 ${proj.reports_count} reports</span>
-            <span>💬 ${proj.conversations_count} conversations</span>
+      container.innerHTML = data.projects.map(p => {
+        const isActive = p.id === data.active_project_id;
+        return `<div class="project-card ${isActive ? 'active' : ''}" onclick="activateProject('${p.id}')">
+          <div class="project-card-header">
+            ${isActive ? '⭐ ' : ''}${esc(p.name)}
           </div>
-          <div class="project-card-date">Created: ${formatDate(proj.created)}</div>
-        `;
-        
-        card.addEventListener('click', () => activateProject(proj.id));
-        container.appendChild(card);
-      
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+          <div class="project-card-meta">${esc(p.field)} · ${new Date(p.created).toLocaleDateString()}</div>
+          <div class="project-card-stats">${p.reports_count || 0} reports · ${p.conversations_count || 0} chats</div>
+          ${p.description ? `<div class="project-card-desc">${esc(p.description)}</div>` : ''}
+        </div>`;
+      }).join('');
     })
-    .catch(err => console.error('Failed to load projects:', err));
+    .catch(err => console.error('loadProjects error:', err));
+}
+
+function activateProject(projectId) {
+  fetch(`/api/projects/${projectId}/activate`, { method: 'PUT' })
+    .then(r => r.json())
+    .then(() => {
+      loadProjects();
+      showToast('Project activated!');
+    })
+    .catch(err => console.error('activateProject error:', err));
+}
+
+function showNewProjectModal() {
+  document.getElementById('new-project-modal')?.classList.remove('hidden');
+}
+function closeNewProjectModal() {
+  document.getElementById('new-project-modal')?.classList.add('hidden');
+}
+
+function createNewProject() {
+  const name = document.getElementById('new-project-name')?.value.trim();
+  const field = document.getElementById('new-project-field')?.value.trim();
+  const desc = document.getElementById('new-project-desc')?.value.trim();
+  if (!name) { showToast('Please enter a project name', 'error'); return; }
+
+  fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, field, description: desc })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { showToast(data.error, 'error'); return; }
+      closeNewProjectModal();
+      document.getElementById('new-project-name').value = '';
+      document.getElementById('new-project-field').value = '';
+      document.getElementById('new-project-desc').value = '';
+      showToast(`Project "${name}" created!`);
+      loadProjects();
+    })
+    .catch(err => console.error('createNewProject error:', err));
 }
 
 function loadReports() {
-  if (!activeProjectId) {
-    $('reports-list').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No active project. Select a project to view reports.</div>';
-    return;
-  }
-  
-  fetch(`/api/projects/${activeProjectId}/reports`)
+  if (!filingState.activeProjectId) return;
+  fetch(`/api/projects/${filingState.activeProjectId}/reports`)
     .then(r => r.json())
     .then(data => {
-      const container = $('reports-list');
-      container.innerHTML = '';
+      const container = document.getElementById('reports-list');
+      if (!container) return;
       
-      if (data.reports.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No reports yet for this project.</div>';
+      const reports = data.reports || [];
+      if (reports.length === 0) {
+        container.innerHTML = '<div class="filing-empty">No reports yet. Talk to an agent!</div>';
         return;
       }
       
       // Group by date
       const grouped = {};
-      data.reports.forEach(report => {
-        const date = report.timestamp.split('T')[0];
-        if (!grouped[date]) grouped[date] = [];
-        grouped[date].push(report);
+      reports.forEach(r => {
+        const date = new Date(r.timestamp).toLocaleDateString();
+        (grouped[date] = grouped[date] || []).push(r);
+      });
       
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-      
-      Object.keys(grouped).sort().reverse().forEach(date => {
-        const dateHeader = document.createElement('div');
-        dateHeader.className = 'report-group-date';
-        dateHeader.textContent = formatDate(date);
-        container.appendChild(dateHeader);
-        
-        grouped[date].forEach(report => {
-          const card = document.createElement('div');
-          card.className = 'report-card';
-          
-          const agent = AGENTS[report.agent_id] || { emoji: '❓', name: 'Unknown' };
-          const preview = report.text.substring(0, 100) + (report.text.length > 100 ? '...' : '');
-          const time = new Date(report.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' 
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-          
-          card.innerHTML = `
-            <div class="report-card-header">
-              <span class="report-card-emoji">${agent.emoji}</span>
-              <span class="report-card-agent">${escapeHtml(agent.name)}</span>
-              <span class="report-card-time">${time}</span>
-            </div>
-            <div class="report-card-preview">${escapeHtml(preview)}</div>
-          `;
-          
-          card.addEventListener('click', () => openReportFromFiling(report));
-          container.appendChild(card);
-        
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
-      
-  
-  // Filing tabs
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-  
-  // New project
-  $('new-project-btn').addEventListener('click', showNewProjectModal);
-  $('new-project-cancel').addEventListener('click', closeNewProjectModal);
-  $('new-project-confirm').addEventListener('click', createNewProject);
-  
-  // Add memory
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
-  $('memory-note-cancel').addEventListener('click', closeAddMemoryModal);
-  $('memory-note-confirm').addEventListener('click', saveMemoryNote);
-  
-  // Memory agent selector
-  $('memory-agent-select').addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
-});
+      container.innerHTML = Object.entries(grouped)
+        .sort(([a], [b]) => new Date(b) - new Date(a))
+        .map(([date, items]) => `
+          <div class="report-group-date">${date}</div>
+          ${items.map(r => {
+            const agent = AGENTS[r.agent_id] || { emoji: '❓', name: 'Unknown' };
+            const preview = (r.text || '').substring(0, 100) + ((r.text || '').length > 100 ? '...' : '');
+            const time = new Date(r.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            return `<div class="report-card" onclick="openReportFromFiling('${esc(r.agent_id)}', '${esc(r.timestamp)}')">
+              <div class="report-card-header">${agent.emoji} ${esc(agent.name)} · ${time}</div>
+              <div class="report-card-preview">${esc(preview)}</div>
+            </div>`;
+          }).join('')}
+        `).join('');
     })
-    .catch(err => console.error('Failed to load reports:', err));
+    .catch(err => console.error('loadReports error:', err));
 }
 
-function loadMemory(type) {
-  currentMemoryType = type;
-  
-  if (type === 'agent') {
-    loadAgentMemory(currentAgentForMemory);
-  } else if (type === 'project') {
-    loadProjectMemory();
-  } else if (type === 'lab') {
-    loadLabMemory();
+function openReportFromFiling(agentId, timestamp) {
+  // Find the report in state.reports or fetch it
+  const report = state.reports.find(r => r.agent_id === agentId && r.timestamp === timestamp);
+  if (report) {
+    openReportPanel(report);
   }
+}
+
+function loadMemory() {
+  loadAgentMemory(document.getElementById('memory-agent-select')?.value || 'scout');
+  loadProjectMemory();
+  loadLabMemory();
+}
+
+function loadAgentMemory(agentId) {
+  fetch(`/api/agents/${agentId}/memory`)
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('agent-memory-list');
+      if (!container) return;
+      const entries = data.entries || [];
+      container.innerHTML = entries.length === 0
+        ? '<div class="filing-empty">No agent memory yet.</div>'
+        : entries.map(e => `<div class="memory-entry"><span class="memory-ts">${new Date(e.timestamp).toLocaleString()}</span> ${esc(e.text)}</div>`).join('');
+    })
+    .catch(err => console.error('loadAgentMemory error:', err));
 }
 
 function loadProjectMemory() {
-  if (!activeProjectId) {
-    $('project-memory-list').innerHTML = '<div class="empty-state" style="padding:20px 0;font-size:11px;">No active project</div>';
-    return;
-  }
-  
-  fetch(`/api/projects/${activeProjectId}/memory`)
+  if (!filingState.activeProjectId) return;
+  fetch(`/api/projects/${filingState.activeProjectId}/memory`)
     .then(r => r.json())
     .then(data => {
-      renderMemoryList('project-memory-list', data.memory);
+      const container = document.getElementById('project-memory-list');
+      if (!container) return;
+      const entries = data.entries || [];
+      container.innerHTML = entries.length === 0
+        ? '<div class="filing-empty">No project memory yet.</div>'
+        : entries.map(e => `<div class="memory-entry"><span class="memory-ts">${new Date(e.timestamp).toLocaleString()}</span> ${esc(e.text)}</div>`).join('');
     })
-    .catch(err => console.error('Failed to load project memory:', err));
+    .catch(err => console.error('loadProjectMemory error:', err));
 }
 
 function loadLabMemory() {
   fetch('/api/memory')
     .then(r => r.json())
     .then(data => {
-      renderMemoryList('lab-memory-list', data.memory);
+      const container = document.getElementById('lab-memory-list');
+      if (!container) return;
+      const entries = data.entries || [];
+      container.innerHTML = entries.length === 0
+        ? '<div class="filing-empty">No lab memory yet.</div>'
+        : entries.map(e => `<div class="memory-entry"><span class="memory-ts">${new Date(e.timestamp).toLocaleString()}</span> ${esc(e.text)}</div>`).join('');
     })
-    .catch(err => console.error('Failed to load lab memory:', err));
+    .catch(err => console.error('loadLabMemory error:', err));
 }
+
+function showAddMemoryModal(type) {
+  filingState.memoryType = type;
+  document.getElementById('add-memory-modal')?.classList.remove('hidden');
+  document.getElementById('memory-note-text').value = '';
+}
+function closeAddMemoryModal() {
+  document.getElementById('add-memory-modal')?.classList.add('hidden');
+}
+
+function saveMemoryNote() {
+  const text = document.getElementById('memory-note-text')?.value.trim();
+  if (!text) { showToast('Please enter a note', 'error'); return; }
+
+  const type = filingState.memoryType;
+  let url, body;
+
+  if (type === 'agent') {
+    const agentId = document.getElementById('memory-agent-select')?.value || 'scout';
+    url = `/api/agents/${agentId}/memory`;
+    body = { text };
+  } else if (type === 'project') {
+    url = `/api/projects/${filingState.activeProjectId}/memory`;
+    body = { text };
+  } else {
+    url = '/api/memory';
+    body = { text };
+  }
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+    .then(r => r.json())
+    .then(() => {
+      closeAddMemoryModal();
+      showToast('Memory saved!');
+      loadMemory();
+    })
+    .catch(err => console.error('saveMemoryNote error:', err));
+}
+
+function esc(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// Initialize filing cabinet on DOM ready
+document.addEventListener('DOMContentLoaded', initFilingCabinet);
