@@ -1375,12 +1375,16 @@ def _load_llm_env():
                 os.environ.setdefault(k.strip(), v.strip())
 
 
-def _run_llm(prompt: str) -> str:
-    """Call LLM via OpenAI-compatible API."""
+def _run_llm(messages, max_tokens: int = 4096) -> str:
+    """Call LLM via OpenAI-compatible API. Accepts messages list or plain string."""
     _load_llm_env()
     api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         return "⚠️ LLM not configured. Set LLM_API_KEY in .env"
+
+    # Support both string and messages list
+    if isinstance(messages, str):
+        messages = [{"role": "user", "content": messages}]
 
     try:
         from openai import OpenAI
@@ -1390,8 +1394,8 @@ def _run_llm(prompt: str) -> str:
         )
         resp = client.chat.completions.create(
             model=os.environ.get("LLM_MODEL", "deepseek-ai/DeepSeek-V3-0324"),
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=2048,
+            messages=messages,
+            max_tokens=max_tokens,
             temperature=0.3,
         )
         return (resp.choices[0].message.content or "").strip()
