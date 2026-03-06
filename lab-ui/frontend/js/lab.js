@@ -117,15 +117,50 @@ function buildAgentSprites() {
       </div>
     `;
 
-    // Start idle animation
-    let frame = 0;
+    // Sprite animation system
     const spriteEl = el.querySelector('.agent-sprite-img');
-    setInterval(() => {
-      frame = (frame + 1) % 4;
-      spriteEl.style.backgroundPositionX = `${-frame * 96}px`;
-    }, 400);
+    const agentAnim = {
+      el: spriteEl,
+      mode: 'idle',        // idle | clicked | working
+      frameIdx: 0,
+      timer: null
+    };
 
-    el.addEventListener("click", () => openDialogue(id));
+    // Different idle speeds per agent (ms) — staggered so they don't sync
+    const idleSpeeds = {
+      scout: 700, stat: 850, quill: 600, sage: 1000,
+      critic: 750, trend: 550, warden: 900, main: 800
+    };
+
+    const frameSequences = {
+      idle:    [0, 2],      // frames 1 & 3: gentle breathing/sway
+      clicked: [0, 1],      // frames 1 & 2: excited jump
+      working: [0, 2, 3]    // frames 1, 3, 4: active thinking
+    };
+
+    function animateAgent() {
+      const seq = frameSequences[agentAnim.mode] || frameSequences.idle;
+      agentAnim.frameIdx = (agentAnim.frameIdx + 1) % seq.length;
+      const frame = seq[agentAnim.frameIdx];
+      agentAnim.el.style.backgroundPositionX = `${-frame * 96}px`;
+    }
+
+    // Start with random offset so agents don't all tick together
+    const speed = idleSpeeds[id] || 700;
+    setTimeout(() => {
+      agentAnim.timer = setInterval(animateAgent, speed);
+    }, Math.random() * speed);
+
+    // Store animation state on the element for external control
+    el._anim = agentAnim;
+    el._animSpeeds = idleSpeeds;
+    el._animSeqs = frameSequences;
+
+    el.addEventListener("click", () => {
+      // Switch to clicked animation briefly
+      setAgentAnimMode(id, 'clicked', 300);
+      openDialogue(id);
+    });
     scene.appendChild(el);
   }
 }
@@ -392,9 +427,11 @@ function updateAgentStatus(agentId, status, detail) {
 
   if (status === "working" || status === "researching" || status === "executing") {
     sprite.classList.add("working");
+    setAgentAnimMode(agentId, "working");
     bubble.textContent = detail ? detail.slice(0, 30) + (detail.length > 30 ? "…" : "") : "working…";
   } else {
     sprite.classList.remove("working");
+    setAgentAnimMode(agentId, "idle");
     bubble.textContent = "";
   }
 }
