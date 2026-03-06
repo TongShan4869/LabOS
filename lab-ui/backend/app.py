@@ -961,16 +961,22 @@ def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
         system_text += f"\n\n--- MEMORY ---\n{memory_ctx}"
     
     if skill:
-        skill_spec = SKILL_ARG_SPECS.get(skill, {})
-        system_text += f"""\n\n--- SKILL AVAILABLE ---
-You have a skill: {skill}
-To use it, include this exact marker in your response:
-[RUN_SKILL]
-Then the skill will run and you'll see its output in the next message.
+        system_text += f"""\n\n--- TOOL ---
+You have access to ONE tool: {skill}
+You MUST ONLY use it when the user EXPLICITLY asks for a new search/analysis/task.
 
-IMPORTANT: Only run the skill when the user wants a NEW action (search, analysis, etc).
-If they're asking about previous results or chatting, just respond from conversation history.
-If you decide to run the skill, also include the user's core request so the skill knows what to do."""
+To use the tool, your response must START with exactly: [RUN_SKILL]
+followed by what you want to search/analyze.
+
+DO NOT use the tool for:
+- Greetings ("hi", "hello")
+- Questions about your capabilities ("what can you do?")
+- Follow-up questions about previous results
+- General conversation
+- Anything that is NOT a direct request for new work
+
+For those, just respond normally as a helpful research assistant.
+When asked "what can you do?", explain your role and capabilities in plain text."""
     
     messages = [{"role": "system", "content": system_text}]
     for msg in history[:-1]:  # exclude the current message (already in history)
