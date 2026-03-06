@@ -1511,3 +1511,24 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
+
+/* Markdown in report panel */
+#report-body h1, #report-body h2, #report-body h3 {
+  color: var(--gold);
+  margin: 12px 0 6px;
+  font-family: "Press Start 2P", monospace;
+}
+#report-body h1 { font-size: 12px; }
+#report-body h2 { font-size: 10px; }
+#report-body h3 { font-size: 9px; }
+#report-body ul, #report-body ol { padding-left: 20px; margin: 6px 0; }
+#report-body li { margin: 4px 0; }
+#report-body code { background: rgba(0,0,0,0.4); padding: 1px 4px; border-radius: 2px; font-size: 9px; }
+#report-body pre { background: rgba(0,0,0,0.4); padding: 8px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }
+#report-body pre code { padding: 0; background: none; }
+#report-body strong { color: var(--gold); }
+#report-body a { color: #7dd3fc; text-decoration: underline; }
+#report-body blockquote { border-left: 3px solid var(--gold); padding-left: 10px; opacity: 0.8; margin: 8px 0; }
+#report-body table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9px; }
+#report-body th, #report-body td { border: 1px solid rgba(255,255,255,0.2); padding: 4px 8px; text-align: left; }
+#report-body th { background: rgba(0,0,0,0.3); color: var(--gold); }

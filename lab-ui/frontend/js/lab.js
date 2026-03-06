@@ -709,71 +709,14 @@ function closeReportPanel() {
 }
 
 function formatReport(text) {
-  // Parse the output into structured HTML
-  const lines = text.split("\n");
-  let html = "";
-  let inPaper = false;
-  let paperHtml = "";
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    // Section headers (═══ lines or lines with lots of ═)
-    if (trimmed.includes("════") || trimmed.includes("────")) {
-      if (inPaper) { html += paperHtml + "</div>"; inPaper = false; paperHtml = ""; }
-      continue;
-    }
-
-    // Title lines (centered, with emoji)
-    if (trimmed.startsWith("🔍") || trimmed.startsWith("📋") || trimmed.startsWith("🤖") ||
-        trimmed.startsWith("📊") || trimmed.startsWith("✍️") || trimmed.startsWith("🎓")) {
-      if (inPaper) { html += paperHtml + "</div>"; inPaper = false; paperHtml = ""; }
-      html += `<div class="report-header-line">${escHtml(trimmed)}</div>`;
-      continue;
-    }
-
-    // Paper entries (numbered: "1. [72%] Title...")
-    const paperMatch = trimmed.match(/^(\d+)\.\s*\[\s*(\d+)%\]\s*(.+)/);
-    if (paperMatch) {
-      if (inPaper) { html += paperHtml + "</div>"; }
-      inPaper = true;
-      paperHtml = `<div class="report-paper">`;
-      paperHtml += `<div class="report-paper-title">${paperMatch[1]}. ${escHtml(paperMatch[3])}</div>`;
-      paperHtml += `<span class="report-stat">Relevance: ${paperMatch[2]}%</span>`;
-      continue;
-    }
-
-    // Progress lines (🔬 Searching..., 📖 Searching...)
-    if (trimmed.startsWith("🔬") || trimmed.startsWith("📖") || trimmed.startsWith("📄") ||
-        trimmed.startsWith("🔀") || trimmed.startsWith("🤖")) {
-      if (inPaper) { html += paperHtml + "</div>"; inPaper = false; paperHtml = ""; }
-      html += `<div class="report-progress">${escHtml(trimmed)}</div>`;
-      continue;
-    }
-
-    // Summary text inside a paper
-    if (inPaper) {
-      if (trimmed.startsWith("Summary:") || trimmed.startsWith("→")) {
-        paperHtml += `<div class="report-paper-summary">${escHtml(trimmed)}</div>`;
-      } else if (trimmed.startsWith("Authors:") || trimmed.startsWith("Year:") ||
-                 trimmed.startsWith("Source:") || trimmed.startsWith("Citations:") ||
-                 trimmed.startsWith("DOI:") || trimmed.startsWith("PMID:")) {
-        paperHtml += `<div class="report-paper-meta">${escHtml(trimmed)}</div>`;
-      } else if (trimmed) {
-        paperHtml += `<div>${escHtml(trimmed)}</div>`;
-      }
-      continue;
-    }
-
-    // Default: plain text line
-    if (trimmed) {
-      html += `<div>${escHtml(trimmed)}</div>`;
-    }
+  // Render markdown if marked.js is available
+  if (typeof marked !== 'undefined') {
+    return marked.parse(text);
   }
-
-  if (inPaper) { html += paperHtml + "</div>"; }
-
-  return html || `<div>${escHtml(text)}</div>`;
+  // Fallback: basic formatting
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
 }
 
 function escHtml(s) {
