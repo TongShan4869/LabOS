@@ -627,6 +627,7 @@ function openReportPanel(agentId, text, ts) {
   reportTs.textContent = ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"});
   reportBody.innerHTML = formatReport(text);
   reportOverlay.classList.remove("hidden");
+  dlgOverlay.classList.add("shifted");
 }
 
 function closeReportPanel() {
