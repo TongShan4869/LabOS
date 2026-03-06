@@ -21,9 +21,11 @@
       <span id="hud-title">LabOS</span>
     </div>
     <div id="hud-right">
+      <button id="hud-filing" class="hud-btn" title="Filing Cabinet">📂</button>
       <button id="hud-reports" class="hud-btn hidden" title="View reports">📋 <span id="hud-reports-count">0</span></button>
       <span id="hud-time">--:--</span>
       <span id="hud-date">--- -- --</span>
+      <span id="hud-active-project" class="hud-project-label"></span>
     </div>
   </div>
 
@@ -79,6 +81,93 @@
         <button id="report-close">✕ Close</button>
       </div>
       <div id="report-body"></div>
+    </div>
+  </div>
+
+
+  <!-- ── Filing Cabinet Panel ──────────────────── -->
+  <div id="filing-overlay" class="hidden">
+    <div id="filing-panel">
+      <div id="filing-header">
+        <h2>📂 Lab Filing Cabinet</h2>
+        <button id="filing-close">✕ Close</button>
+      </div>
+      
+      <div id="filing-tabs">
+        <button class="filing-tab active" data-tab="projects">Projects</button>
+        <button class="filing-tab" data-tab="reports">Reports</button>
+        <button class="filing-tab" data-tab="memory">Memory</button>
+      </div>
+      
+      <div id="filing-content">
+        <!-- Projects Tab -->
+        <div class="filing-tab-content active" id="filing-tab-projects">
+          <div id="projects-list"></div>
+          <button id="new-project-btn" class="filing-action-btn">+ New Project</button>
+        </div>
+        
+        <!-- Reports Tab -->
+        <div class="filing-tab-content" id="filing-tab-reports">
+          <div id="reports-list"></div>
+        </div>
+        
+        <!-- Memory Tab -->
+        <div class="filing-tab-content" id="filing-tab-memory">
+          <div class="memory-section">
+            <h3>Agent Memory</h3>
+            <select id="memory-agent-select">
+              <option value="main">醋の虾</option>
+              <option value="scout">Scout</option>
+              <option value="stat">Stat</option>
+              <option value="quill">Quill</option>
+              <option value="sage">Sage</option>
+              <option value="critic">Critic</option>
+              <option value="trend">Trend</option>
+              <option value="warden">Warden</option>
+            </select>
+            <div id="agent-memory-list" class="memory-list"></div>
+            <button class="add-memory-btn" data-type="agent">+ Add Note</button>
+          </div>
+          
+          <div class="memory-section">
+            <h3>Project Memory</h3>
+            <div id="project-memory-list" class="memory-list"></div>
+            <button class="add-memory-btn" data-type="project">+ Add Note</button>
+          </div>
+          
+          <div class="memory-section">
+            <h3>Lab Memory</h3>
+            <div id="lab-memory-list" class="memory-list"></div>
+            <button class="add-memory-btn" data-type="lab">+ Add Note</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Project Modal -->
+  <div id="new-project-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Create New Project</h3>
+      <input type="text" id="new-project-name" placeholder="Project Name" />
+      <input type="text" id="new-project-field" placeholder="Field (e.g., neuroimaging)" />
+      <textarea id="new-project-desc" placeholder="Description (optional)"></textarea>
+      <div class="modal-actions">
+        <button id="new-project-confirm" class="modal-btn-primary">Create</button>
+        <button id="new-project-cancel" class="modal-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Memory Modal -->
+  <div id="add-memory-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Add Memory Entry</h3>
+      <textarea id="memory-note-text" placeholder="What should I remember?"></textarea>
+      <div class="modal-actions">
+        <button id="memory-note-confirm" class="modal-btn-primary">Save</button>
+        <button id="memory-note-cancel" class="modal-btn">Cancel</button>
+      </div>
     </div>
   </div>
 

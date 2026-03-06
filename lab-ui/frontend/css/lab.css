@@ -1078,3 +1078,417 @@ body {
 #hud-left:hover {
   background: rgba(255,255,255,0.05);
 }
+
+/* ─── Filing Cabinet ────────────────────────────────────────────────────────── */
+
+#filing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+}
+
+#filing-panel {
+  background: var(--dlg-bg);
+  border: 4px solid var(--dlg-border);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.3);
+  width: 500px;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+#filing-header {
+  background: var(--dlg-border);
+  color: var(--dlg-text);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--dlg-shadow);
+}
+
+#filing-header h2 {
+  font-family: var(--pixel-font), monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+#filing-close {
+  background: var(--name-bg);
+  border: 2px solid var(--dlg-shadow);
+  color: var(--dlg-text);
+  font-family: var(--pixel-font), monospace;
+  font-size: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#filing-close:hover {
+  background: var(--dlg-shadow);
+  color: var(--text);
+  transform: scale(1.05);
+}
+
+#filing-tabs {
+  display: flex;
+  background: var(--portrait-bg);
+  border-bottom: 2px solid var(--dlg-shadow);
+}
+
+.filing-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-right: 2px solid var(--dlg-shadow);
+  color: var(--text-dim);
+  font-family: var(--pixel-font), monospace;
+  font-size: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.filing-tab:last-child {
+  border-right: none;
+}
+
+.filing-tab:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+
+.filing-tab.active {
+  background: var(--dlg-bg);
+  color: var(--gold);
+  border-bottom: 3px solid var(--gold);
+}
+
+#filing-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--dlg-inner);
+}
+
+.filing-tab-content {
+  display: none;
+}
+
+.filing-tab-content.active {
+  display: block;
+}
+
+/* Project Cards */
+.project-card {
+  background: var(--dlg-bg);
+  border: 3px solid var(--zone-border);
+  padding: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.project-card:hover {
+  border-color: var(--dlg-border);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transform: translateY(-2px);
+}
+
+.project-card.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 16px rgba(233,196,106,0.4);
+}
+
+.project-card.active::before {
+  content: '⭐';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 16px;
+}
+
+.project-card-name {
+  font-family: var(--pixel-font), monospace;
+  font-size: 11px;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.project-card-field {
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.project-card-stats {
+  font-family: monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  display: flex;
+  gap: 12px;
+}
+
+.project-card-date {
+  font-family: monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+/* Report Cards */
+.report-group-date {
+  font-family: var(--pixel-font), monospace;
+  font-size: 9px;
+  color: var(--gold);
+  margin: 16px 0 8px 0;
+  letter-spacing: 1px;
+}
+
+.report-card {
+  background: var(--dlg-bg);
+  border: 2px solid var(--zone-border);
+  padding: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.report-card:hover {
+  border-color: var(--dlg-border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.report-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.report-card-emoji {
+  font-size: 16px;
+}
+
+.report-card-agent {
+  font-family: var(--pixel-font), monospace;
+  font-size: 9px;
+  color: var(--text);
+}
+
+.report-card-time {
+  font-family: monospace;
+  font-size: 8px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.report-card-preview {
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* Memory Sections */
+.memory-section {
+  background: var(--portrait-bg);
+  border: 2px solid var(--zone-border);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.memory-section h3 {
+  font-family: var(--pixel-font), monospace;
+  font-size: 9px;
+  color: var(--gold);
+  margin: 0 0 10px 0;
+  letter-spacing: 1px;
+}
+
+#memory-agent-select {
+  width: 100%;
+  background: var(--dlg-bg);
+  border: 2px solid var(--zone-border);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  padding: 6px;
+  margin-bottom: 10px;
+}
+
+.memory-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.memory-item {
+  background: var(--dlg-bg);
+  border-left: 3px solid var(--accent2);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.memory-item-timestamp {
+  font-family: monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* Action Buttons */
+.filing-action-btn,
+.add-memory-btn {
+  width: 100%;
+  background: var(--accent2);
+  border: 2px solid var(--accent);
+  color: var(--text);
+  font-family: var(--pixel-font), monospace;
+  font-size: 9px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.filing-action-btn:hover,
+.add-memory-btn:hover {
+  background: var(--accent);
+  transform: scale(1.02);
+}
+
+/* Modals */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.modal-content {
+  background: var(--dlg-inner);
+  border: 4px solid var(--dlg-border);
+  padding: 20px;
+  width: 400px;
+  max-width: 90vw;
+}
+
+.modal-content h3 {
+  font-family: var(--pixel-font), monospace;
+  font-size: 11px;
+  color: var(--dlg-text);
+  margin: 0 0 16px 0;
+  letter-spacing: 1px;
+}
+
+.modal-content input,
+.modal-content textarea {
+  width: 100%;
+  background: white;
+  border: 2px solid var(--zone-border);
+  color: var(--dlg-text);
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  padding: 10px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.modal-content textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.modal-btn,
+.modal-btn-primary {
+  flex: 1;
+  background: var(--zone-border);
+  border: 2px solid var(--dlg-shadow);
+  color: var(--text);
+  font-family: var(--pixel-font), monospace;
+  font-size: 9px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-btn-primary {
+  background: var(--accent2);
+  border-color: var(--accent);
+}
+
+.modal-btn:hover,
+.modal-btn-primary:hover {
+  transform: scale(1.05);
+}
+
+.modal-btn-primary:hover {
+  background: var(--accent);
+}
+
+/* Active Project Label in HUD */
+.hud-project-label {
+  font-size: 7px;
+  color: var(--gold);
+  margin-left: 10px;
+}
+
+.hud-project-label::before {
+  content: '📂 ';
+}
+
+/* Empty States */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.empty-state-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
