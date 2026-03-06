@@ -578,20 +578,20 @@ def _get_combined_memory(agent_id: str) -> str:
     agent_mem_file = AGENTS_MEM_DIR / agent_id / "memory.json"
     agent_mem = _load_memory(agent_mem_file)
     if agent_mem:
-        parts.append("## Agent Memory (Personal Context):\n" + "\n".join(f"- {e['text']}" for e in agent_mem[-10:]))
+        parts.append("## Agent Memory (Personal Context):\n" + "\n".join(f"- {e['text'][:200]}" for e in agent_mem[-5:]))
     
     # Project memory
     if active_project:
         proj_mem_file = PROJECTS_DIR / active_project / "memory.json"
         proj_mem = _load_memory(proj_mem_file)
         if proj_mem:
-            parts.append("## Project Memory (Current Project):\n" + "\n".join(f"- {e['text']}" for e in proj_mem[-10:]))
+            parts.append("## Project Memory (Current Project):\n" + "\n".join(f"- {e['text']}" for e in proj_mem[-5:]))
     
     # Shared lab memory
     shared_mem_file = SHARED_DIR / "memory.json"
     shared_mem = _load_memory(shared_mem_file)
     if shared_mem:
-        parts.append("## Lab Memory (Cross-Project):\n" + "\n".join(f"- {e['text']}" for e in shared_mem[-10:]))
+        parts.append("## Lab Memory (Cross-Project):\n" + "\n".join(f"- {e['text']}" for e in shared_mem[-5:]))
     
     return "\n\n".join(parts) if parts else ""
 
@@ -952,8 +952,10 @@ def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
     system_prompt = AGENT_PROMPTS.get(agent_id, "You are a helpful research assistant.")
     memory_ctx = _get_combined_memory(agent_id)
     
-    # Get recent conversation history
-    history = message_history.get(agent_id, [])[-20:]
+    # Get recent conversation history (limited to avoid token overflow)
+    history = message_history.get(agent_id, [])[-10:]
+    # Truncate long messages to keep context manageable
+    history = [{"role": m["role"], "text": m["text"][:500]} for m in history]
     
     # Build messages for LLM
     system_text = system_prompt
