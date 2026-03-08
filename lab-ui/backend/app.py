@@ -402,7 +402,7 @@ def _ensure_data_structure():
     SHARED_DIR.mkdir(exist_ok=True)
     
     # Initialize shared memory (LAB_MEMORY.md)
-    shared_mem_file = BASE_DIR / "LAB_MEMORY.md"
+    shared_mem_file = LAB_DIR / "LAB_MEMORY.md"
     if not shared_mem_file.exists():
         shared_mem_file.write_text(json.dumps([], indent=2))
     
@@ -606,7 +606,7 @@ def _get_combined_memory(agent_id: str) -> str:
             parts.append("## Project Memory (Current Project):\n" + "\n".join(f"- {e['text']}" for e in proj_mem[-5:]))
     
     # Shared lab memory (LAB_MEMORY.md)
-    lab_memory_file = BASE_DIR / "LAB_MEMORY.md"
+    lab_memory_file = LAB_DIR / "LAB_MEMORY.md"
     lab_memory = _load_memory_md(lab_memory_file)
     if lab_memory:
         # Inject full lab memory (markdown is compact enough)
@@ -1147,7 +1147,7 @@ Examples of good memory entries:
             # Also save to LAB_MEMORY.md if it seems globally relevant
             global_keywords = ["prefer", "always", "never", "style", "format", "field", "hypothesis", "focus", "background", "corrected"]
             if any(kw in result.lower() for kw in global_keywords):
-                lab_mem_file = BASE_DIR / "LAB_MEMORY.md"
+                lab_mem_file = LAB_DIR / "LAB_MEMORY.md"
                 _append_memory_md(lab_mem_file, f"[{agent_name}] {result}")
             
             print(f"[MEMORY] {agent_name} saved: {result[:80]}")
