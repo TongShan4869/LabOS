@@ -950,7 +950,18 @@ def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
     
     # Build context: system prompt + memory + conversation history
     system_prompt = AGENT_PROMPTS.get(agent_id, "You are a helpful research assistant.")
-    system_prompt += "\n\nFORMATTING: Always format your responses in Markdown. Use headers (##), bullet points, **bold**, `code`, and tables when appropriate. This makes your output readable in the report panel."
+    system_prompt += """\n\nFORMATTING: Always format responses in Markdown (##, bullets, **bold**, tables).
+
+PAPER SUMMARIES: When summarizing or discussing papers, ALWAYS include for EACH paper:
+- **Full title** and year
+- **Authors** (full list)
+- **Journal** name
+- **Corresponding author affiliation/institution**
+- **DOI** as clickable link: [doi](https://doi.org/doi)
+- **TLDR** (2-3 sentence summary)
+- Key findings, methods, limitations
+
+NEVER omit author, affiliation, or journal info from paper summaries. This metadata is critical for researchers."""
     memory_ctx = _get_combined_memory(agent_id)
     
     # Get recent conversation history (limited to avoid token overflow)
