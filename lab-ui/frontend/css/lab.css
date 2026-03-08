@@ -633,21 +633,7 @@ body {
 }
 
 /* ── Reports list panel ──────────────────────────── */
-#reports-list {
-  position: fixed;
-  top: 50px;
-  right: 12px;
-  width: 280px;
-  max-height: 400px;
-  background: rgba(10,10,20,0.97);
-  border: 2px solid var(--hud-border);
-  box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
-  z-index: 2000;
-  overflow-y: auto;
-  display: none;
-}
-
-#reports-list.open { display: block; }
+/* Old fixed reports tray removed — now in filing cabinet */
 
 .reports-list-header {
   font-family: var(--pixel-font), monospace;
