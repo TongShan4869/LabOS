@@ -1160,9 +1160,12 @@ function createNewProject() {
 }
 
 function loadReports() {
+  console.log('[REPORTS] loadReports called');
   const pid = filingState.activeProjectId;
+  console.log('[REPORTS] pid:', pid);
   const container = document.getElementById('reports-list');
-  if (!container) return;
+  console.log('[REPORTS] container:', container);
+  if (!container) { console.error('[REPORTS] NO CONTAINER'); return; }
   if (!pid) { container.innerHTML = '<div class="filing-empty">No active project. Select one first.</div>'; return; }
   
   container.innerHTML = '<div class="filing-empty">Loading...</div>';
