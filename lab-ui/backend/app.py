@@ -665,6 +665,28 @@ def _calc_level(xp: int) -> tuple:
         cumulative += needed
         level += 1
 
+def _award_xp_backend(amount: int, event: str, badge: str = None):
+    """Award XP from the backend (for agent interactions)."""
+    try:
+        data = json.loads(XP_FILE.read_text()) if XP_FILE.exists() else {"xp": 0, "badges": [], "history": []}
+        data["xp"] = data.get("xp", 0) + amount
+        if badge and badge not in data.get("badges", []):
+            data.setdefault("badges", []).append(badge)
+        data.setdefault("history", []).append({
+            "event": event,
+            "xp": amount,
+            "timestamp": datetime.now().isoformat()
+        })
+        # Recalculate level
+        level, title, xp_next, _ = _calc_level(data["xp"])
+        data["level"] = level
+        data["level_title"] = title
+        data["xp_to_next"] = xp_next
+        XP_FILE.write_text(json.dumps(data, indent=2))
+    except Exception as e:
+        print(f"[XP] Error: {e}")
+
+
 def load_xp() -> dict:
     data = {"xp": 0, "level": 1, "level_title": "Confused First-Year", "badges": []}
     if XP_FILE.exists():
@@ -1056,6 +1078,8 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         active_proj = _get_active_project_id()
         if active_proj and len(response) > 500:
             _save_report(active_proj, agent_id, agent["name"], response)
+        # Award XP for agent conversation
+        _award_xp_backend(10, f"Chat with {agent['name']}")
 
 
 # ─── Skill argument extraction ────────────────────────────────────────────────
@@ -1354,6 +1378,8 @@ def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, si
             if active_proj and len(final_text) > 200:
                 _save_report(active_proj, agent_id, agent["name"], final_text)
                 print(f"[REPORT] Saved report for {agent_id} ({len(final_text)} chars)")
+                # Award XP for skill completion
+                _award_xp_backend(50, f"Skill run: {skill}", f"🔬 Literature Dive")
 
         if proc.returncode != 0 and stderr.strip():
             _emit_agent_reply(agent_id, agent,

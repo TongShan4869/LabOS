@@ -955,6 +955,13 @@ function showXpModal() {
       } else {
         badgesContainer.innerHTML = '<span class="xp-badge">🎯 First Steps</span>';
       }
+      // Populate recent XP history
+      const histEl = $('xp-history');
+      if (histEl && xp.history && xp.history.length > 0) {
+        histEl.innerHTML = xp.history.slice(-10).reverse()
+          .map(h => `<div class="xp-history-item">+${h.xp} XP — ${h.event}</div>`)
+          .join('');
+      }
     })
     .catch(err => console.error('Failed to load XP data:', err));
 }
