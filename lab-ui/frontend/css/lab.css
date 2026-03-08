@@ -442,7 +442,7 @@ body {
   top: 0; right: 0; bottom: 0;
   width: min(600px, 85vw);
   z-index: 1500;
-  display: flex;
+  display: none;
   flex-direction: column;
   animation: slideInRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   box-shadow: -8px 0 32px rgba(0,0,0,0.6);
@@ -671,7 +671,7 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   background: var(--bg);
   z-index: 3000;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.3s;
@@ -833,7 +833,7 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   background: var(--bg);
   z-index: 3500;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.3s;
@@ -1613,3 +1613,6 @@ body {
   opacity: 0.5;
   line-height: 1.3;
 }
+
+/* Universal hidden override */
+.hidden { display: none !important; }
