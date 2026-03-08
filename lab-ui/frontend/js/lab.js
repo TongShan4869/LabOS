@@ -1,16 +1,26 @@
 
 // ── Day/Night background ────────────────────────────────────────────────────
+let forceNight = null; // null = auto, true = night, false = day
 function updateBackground() {
   const hour = new Date().getHours();
-  const isNight = hour >= 19 || hour < 7; // 7pm-7am = night
+  const isNight = forceNight !== null ? forceNight : (hour >= 19 || hour < 7);
   const scene = document.getElementById('lab-scene');
+  const btn = document.getElementById('hud-daynight');
   if (scene) {
     const bg = isNight ? 'lab-background-night.png' : 'lab-background-day.png';
     scene.style.backgroundImage = `url('assets/lab/${bg}')`;
   }
+  if (btn) btn.textContent = isNight ? '☀️' : '🌙';
+}
+function toggleDayNight() {
+  const hour = new Date().getHours();
+  const autoNight = hour >= 19 || hour < 7;
+  if (forceNight === null) forceNight = !autoNight;
+  else forceNight = !forceNight;
+  updateBackground();
 }
 updateBackground();
-setInterval(updateBackground, 60000); // check every minute
+setInterval(updateBackground, 60000);
 /**
  * LabOS — Stardew-style research lab UI
  * Click agents to talk. Dialogue box slides up. Typewriter text.
@@ -1339,6 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('chatlog-overlay')?.addEventListener('click', (e) => {
       if (e.target.id === 'chatlog-overlay') closeChatLog();
     });
+    $('hud-daynight')?.addEventListener('click', toggleDayNight);
     console.log('[INIT] All UI listeners registered');
   } catch(e) { console.error('[INIT] Error:', e); }
 });
