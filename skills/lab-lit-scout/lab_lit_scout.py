@@ -314,6 +314,7 @@ def dedup(papers: list[dict]) -> list[dict]:
 
 
 def score_paper(paper: dict, query: str, user_fields: list[str]) -> int:
+    """Keyword fallback scorer (used if LLM batch scoring fails)."""
     query_words = set(query.lower().split())
     field_words = set(" ".join(user_fields).lower().split())
 
@@ -339,6 +340,66 @@ def score_paper(paper: dict, query: str, user_fields: list[str]) -> int:
         recency +
         cite_score
     )
+
+
+def score_papers_semantic(papers: list[dict], query: str, user_fields: list[str]) -> list[dict]:
+    """Score papers using LLM semantic similarity in a single batch call."""
+    progress("Scoring papers with AI semantic analysis…", "🧠")
+    
+    # Build compact paper summaries for the prompt
+    paper_entries = []
+    for i, p in enumerate(papers):
+        abstract_snippet = (p.get("abstract", "") or "")[:300]
+        paper_entries.append(
+            f"{i}: Title: {p.get('title', '')} | "
+            f"Abstract: {abstract_snippet} | "
+            f"Year: {p.get('year', '')} | "
+            f"Journal: {p.get('journal', '')} | "
+            f"Citations: {p.get('citations', 0)}"
+        )
+    
+    papers_block = "\n".join(paper_entries)
+    fields_str = ", ".join(user_fields) if user_fields else "general research"
+    
+    prompt = f"""You are a research paper relevance scorer. Score each paper's relevance to the search query on a 0-100 scale.
+
+SEARCH QUERY: "{query}"
+RESEARCHER'S FIELDS: {fields_str}
+
+SCORING CRITERIA (semantic, not just keyword matching):
+- 80-100: Directly addresses the query topic, high methodological relevance
+- 60-79: Closely related, covers key aspects of the query
+- 40-59: Partially relevant, tangentially related concepts
+- 20-39: Loosely related, different subfield but some overlap
+- 0-19: Not relevant to the query
+
+PAPERS:
+{papers_block}
+
+Respond with ONLY a JSON array of scores in order, e.g. [85, 72, 45, 91, ...]
+No explanation, no markdown, just the array."""
+
+    raw = call_llm(prompt)
+    
+    try:
+        # Clean and parse
+        cleaned = raw.strip().strip("`").strip()
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:].strip()
+        scores = json.loads(cleaned)
+        
+        if isinstance(scores, list) and len(scores) == len(papers):
+            for i, p in enumerate(papers):
+                p["relevance_score"] = max(0, min(100, int(scores[i])))
+            return papers
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+    
+    # Fallback to keyword scoring
+    progress("Falling back to keyword scoring…", "⚠️")
+    for p in papers:
+        p["relevance_score"] = score_paper(p, query, user_fields)
+    return papers
 
 
 # ─── LLM summarise ────────────────────────────────────────────────────────────
@@ -605,8 +666,7 @@ def main():
     progress(f"Deduplicating {len(all_papers)} raw results…", "🔀")
     papers = dedup(all_papers)
 
-    for p in papers:
-        p["relevance_score"] = score_paper(p, args.query, user_fields)
+    papers = score_papers_semantic(papers, args.query, user_fields)
 
     # Sort
     if args.sort == "citations":
