@@ -537,8 +537,7 @@ function updateHud(status) {
   const pct = Math.min(100, Math.round((inLevel / toNext) * 100));
   xpBar.style.width = `${pct}%`;
 
-  hudTime.textContent = status.time || "--:--";
-  hudDate.textContent = status.date || "";
+  // Clock handled by updateClock() — using client local time
 }
 
 // ── Agent status bubbles ──────────────────────────────────────────────────────
