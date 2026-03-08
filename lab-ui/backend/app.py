@@ -401,8 +401,8 @@ def _ensure_data_structure():
     AGENTS_MEM_DIR.mkdir(exist_ok=True)
     SHARED_DIR.mkdir(exist_ok=True)
     
-    # Initialize shared memory
-    shared_mem_file = SHARED_DIR / "memory.json"
+    # Initialize shared memory (LAB_MEMORY.md)
+    shared_mem_file = BASE_DIR / "LAB_MEMORY.md"
     if not shared_mem_file.exists():
         shared_mem_file.write_text(json.dumps([], indent=2))
     
@@ -493,6 +493,24 @@ def _load_memory(file_path: Path) -> list:
         except Exception:
             return []
     return []
+
+
+def _load_memory_md(file_path: Path) -> str:
+    """Load memory from a markdown file."""
+    if file_path.exists():
+        try:
+            return file_path.read_text().strip()
+        except Exception:
+            return ""
+    return ""
+
+
+def _append_memory_md(file_path: Path, entry: str):
+    """Append a memory entry to a markdown file."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    with open(file_path, "a") as f:
+        f.write(f"\n- [{timestamp}] {entry}\n")
 
 
 def _save_memory(file_path: Path, entries: list):
@@ -587,11 +605,13 @@ def _get_combined_memory(agent_id: str) -> str:
         if proj_mem:
             parts.append("## Project Memory (Current Project):\n" + "\n".join(f"- {e['text']}" for e in proj_mem[-5:]))
     
-    # Shared lab memory
-    shared_mem_file = SHARED_DIR / "memory.json"
-    shared_mem = _load_memory(shared_mem_file)
-    if shared_mem:
-        parts.append("## Lab Memory (Cross-Project):\n" + "\n".join(f"- {e['text']}" for e in shared_mem[-5:]))
+    # Shared lab memory (LAB_MEMORY.md)
+    lab_memory_file = BASE_DIR / "LAB_MEMORY.md"
+    lab_memory = _load_memory_md(lab_memory_file)
+    if lab_memory:
+        # Get last ~500 chars to keep context window reasonable
+        recent = lab_memory[-500:] if len(lab_memory) > 500 else lab_memory
+        parts.append("## Lab Memory (Cross-Project):\n" + recent)
     
     return "\n\n".join(parts) if parts else ""
 

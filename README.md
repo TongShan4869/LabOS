@@ -43,8 +43,7 @@ LabOS/
 │   │       └── chats/        ← Conversation history
 │   ├── agents/               ← Per-agent persistent memory
 │   │   └── {agent-id}/
-│   └── shared/
-│       └── memory.json       ← Cross-project shared memory
+│   └── shared/               ← Shared data directory
 ├── skills/
 │   ├── lab_utils.py          ← Shared utilities (XP, levels, output formatting)
 │   ├── lab-init/             ← Onboarding wizard
