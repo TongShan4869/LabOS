@@ -1013,7 +1013,7 @@ function switchFilingTab(tabName) {
   document.querySelectorAll('.filing-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.filing-tab-content').forEach(c => c.classList.add('hidden'));
   const tab = document.querySelector(`.filing-tab[data-tab="${tabName}"]`);
-  const content = document.getElementById(`filing-${tabName}`);
+  const content = document.getElementById(`filing-tab-${tabName}`);
   if (tab) tab.classList.add('active');
   if (content) content.classList.remove('hidden');
 
@@ -1131,11 +1131,22 @@ function loadReports() {
 }
 
 function openReportFromFiling(agentId, timestamp) {
-  // Find the report in state.reports or fetch it
+  // Check in-memory first
   const report = state.reports.find(r => r.agent_id === agentId && r.timestamp === timestamp);
   if (report) {
     openReportPanel(report);
+    return;
   }
+  // Fetch from backend
+  fetch(`/api/projects/${filingState.activeProjectId}/reports`)
+    .then(r => r.json())
+    .then(data => {
+      const r = (data.reports || []).find(r => r.timestamp === timestamp);
+      if (r) {
+        const agent = AGENTS[r.agent_id] || { emoji: "❓", name: "Unknown" };
+        openReportPanel({ agent_id: r.agent_id, text: r.text, name: agent.name, emoji: agent.emoji });
+      }
+    });
 }
 
 function loadMemory() {
