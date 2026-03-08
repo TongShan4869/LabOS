@@ -1025,6 +1025,7 @@ def on_message(data):
 
 def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
     """Intelligent agent loop — LLM decides whether to chat or run a skill."""
+    print(f"[AGENT] route_to_agent called: {agent_id} / {text[:50]}", flush=True)
     skill = agent.get("skill")
     
     # Build context: system prompt + memory + conversation history
@@ -1151,9 +1152,9 @@ Examples of good memory entries:
                 lab_mem_file = REPO_DIR / "LAB_MEMORY.md"
                 _append_memory_md(lab_mem_file, f"[{agent_name}] {result}")
             
-            print(f"[MEMORY] {agent_name} saved: {result[:80]}")
+            print(f"[MEMORY] {agent_name} saved: {result[:80]}", flush=True)
     except Exception as e:
-        print(f"[MEMORY] extraction failed: {e}")
+        print(f"[MEMORY] extraction failed: {e}", flush=True)
 
 # ─── Skill argument extraction ────────────────────────────────────────────────
 
