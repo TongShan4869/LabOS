@@ -1069,7 +1069,7 @@ function showFilingCabinet() {
 
 function closeFilingCabinet() {
   const overlay = document.getElementById('filing-overlay');
-  if (overlay) { overlay.classList.add('hidden'); filingState.open = false; }
+  if (overlay) { overlay.classList.add('hidden'); overlay.style.display = 'none'; filingState.open = false; }
 }
 
 function switchFilingTab(tabName) {
