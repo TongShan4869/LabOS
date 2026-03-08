@@ -206,29 +206,29 @@ nohup bash run.sh > server.log 2>&1 &
 
 ```
 LabOS/
-├── .env                      ← Your API keys (gitignored)
-├── LAB_CONFIG.json           ← Your research fields & preferences
-├── xp.json                   ← Gamification state
+├── .env                      ← Your API keys (gitignored — you create this)
+├── LAB_CONFIG.json           ← Research fields & preferences (created by onboarding)
+├── LAB_MEMORY.md             ← Evolving user profile (auto-generated, gitignored)
+├── research-graph.jsonl      ← Shared knowledge graph across all projects
+├── xp.json                   ← XP, level, badges
 ├── data/
-│   ├── projects/             ← Per-project data
-│   │   └── {id}/
-│   │       ├── meta.json     ← Project metadata
-│   │       ├── memory.json   ← Project-specific memory
-│   │       └── reports/      ← Generated reports
-│   ├── agents/               ← Per-agent memory
-│   └── shared/               ← Cross-project knowledge
+│   ├── active_project.txt    ← Currently selected project ID
+│   ├── projects/{uuid}/      ← Per-project data
+│   │   ├── meta.json         ← Project name, fields, dates
+│   │   ├── memory.json       ← Project-specific agent memory
+│   │   ├── reports/          ← Generated research reports
+│   │   └── chats/            ← Conversation history
+│   ├── agents/{id}/          ← Per-agent persistent memory
+│   └── shared/memory.json    ← Cross-project shared memory
+├── skills/                    ← 9 Python skill scripts + shared utils
+├── gamification/              ← XP engine & state bridge
 ├── lab-ui/
-│   ├── backend/
-│   │   └── app.py            ← Flask + SocketIO server
+│   ├── backend/app.py         ← Flask + SocketIO server
 │   └── frontend/
 │       ├── index.html         ← Main page
-│       ├── css/lab.css        ← All styles
-│       ├── js/lab.js          ← All client logic
-│       └── assets/
-│           ├── lab/           ← Background images (day/night)
-│           ├── sprites/       ← Agent sprite sheets
-│           └── avatars/       ← Agent portrait images
-├── skills/                    ← Skill scripts (Python)
+│       ├── css/lab.css        ← Styles
+│       ├── js/lab.js          ← Client logic
+│       └── assets/            ← Backgrounds, sprites, avatars
 └── docs/                      ← Documentation
 ```
 

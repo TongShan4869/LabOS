@@ -25,23 +25,55 @@ Built for PhD students. Works for any research field.
 
 ```
 LabOS/
+├── .env                      ← API keys & LLM config (gitignored, you create this)
 ├── README.md
 ├── PRD.md                    ← Full product requirements document
-├── LAB_CONFIG.json           ← Your preferences (populated by lab-init)
-├── LAB_MEMORY.md             ← Evolving user profile (auto-updated)
-├── research-graph.jsonl      ← Shared knowledge graph (all projects)
-├── xp.json                   ← Gamification state
-├── sessions/                 ← Per-session logs
-└── skills/
-    ├── lab-init/             ← Onboarding
-    ├── lab-field-trend/      ← Weekly digest
-    ├── lab-lit-scout/        ← Literature search
-    ├── lab-research-advisor/ ← Socratic mentor
-    ├── lab-writing-assistant/← Draft writer
-    ├── lab-peer-reviewer/    ← Peer review simulator
-    ├── lab-security/         ← Lab security warden
-    ├── lab-publishing-assistant/ ← Journal selection + submission
-    └── lab-biostat/          ← Biostatistician
+├── LAB_CONFIG.json           ← Your research fields & preferences (created by onboarding)
+├── LAB_MEMORY.md             ← Evolving user profile (auto-generated, gitignored)
+├── research-graph.jsonl      ← Shared knowledge graph across all projects
+├── trend-history.jsonl       ← Field trend tracking history
+├── xp.json                   ← Gamification state (XP, level, badges)
+├── data/
+│   ├── active_project.txt    ← Currently selected project ID
+│   ├── projects/             ← Per-project data
+│   │   └── {uuid}/
+│   │       ├── meta.json     ← Project name, fields, dates
+│   │       ├── memory.json   ← Project-specific agent memory
+│   │       ├── reports/      ← Generated research reports
+│   │       └── chats/        ← Conversation history
+│   ├── agents/               ← Per-agent persistent memory
+│   │   └── {agent-id}/
+│   └── shared/
+│       └── memory.json       ← Cross-project shared memory
+├── skills/
+│   ├── lab_utils.py          ← Shared utilities (XP, levels, output formatting)
+│   ├── lab-init/             ← Onboarding wizard
+│   ├── lab-lit-scout/        ← Literature search (PubMed, OpenAlex, arXiv)
+│   ├── lab-field-trend/      ← Weekly field digest
+│   ├── lab-research-advisor/ ← Socratic research mentor
+│   ├── lab-writing-assistant/← Drafts sections in your voice
+│   ├── lab-peer-reviewer/    ← Simulates rigorous peer review
+│   ├── lab-publishing-assistant/ ← Journal selection + submission prep
+│   ├── lab-biostat/          ← Study design & statistical analysis
+│   └── lab-security/         ← Research IP protection
+├── gamification/
+│   ├── xp_engine.py          ← XP calculation & level progression
+│   └── lab_state_bridge.py   ← State sync between UI and skill scripts
+├── lab-ui/
+│   ├── backend/
+│   │   ├── app.py            ← Flask + SocketIO server (agent routing, LLM, APIs)
+│   │   └── requirements.txt  ← Python dependencies
+│   └── frontend/
+│       ├── index.html         ← Main page
+│       ├── css/lab.css        ← All styles (HUD, dialogue, filing cabinet, etc.)
+│       ├── js/lab.js          ← All client logic (agents, animations, UI)
+│       └── assets/
+│           ├── lab/           ← Background images (day & night versions)
+│           ├── sprites/       ← Agent sprite sheets (4-frame animations)
+│           └── avatars/       ← Agent portrait images (dialogue box)
+└── docs/
+    ├── getting-started.md     ← Setup guide for new users
+    └── lit-scout-architecture.md ← Literature search pipeline docs
 ```
 
 ### Two-Layer Knowledge Model
