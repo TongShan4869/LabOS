@@ -1014,11 +1014,7 @@ function addToChatLog(who, text) {
   chatLogMessages.push({ who, text, ts: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) });
 }
 
-$('hud-chatlog')?.addEventListener('click', openChatLog);
-$('chatlog-close')?.addEventListener('click', closeChatLog);
-$('chatlog-overlay')?.addEventListener('click', (e) => {
-  if (e.target.id === 'chatlog-overlay') closeChatLog();
-});
+
 
 function initFilingCabinet() {
   const el = (id) => document.getElementById(id);
@@ -1330,4 +1326,11 @@ function esc(s) {
 }
 
 // Initialize filing cabinet on DOM ready
-document.addEventListener('DOMContentLoaded', initFilingCabinet);
+document.addEventListener('DOMContentLoaded', () => {
+  initFilingCabinet();
+  $('hud-chatlog')?.addEventListener('click', openChatLog);
+  $('chatlog-close')?.addEventListener('click', closeChatLog);
+  $('chatlog-overlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'chatlog-overlay') closeChatLog();
+  });
+});
