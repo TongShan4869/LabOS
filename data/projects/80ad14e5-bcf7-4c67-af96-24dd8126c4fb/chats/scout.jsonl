@@ -35,3 +35,5 @@
 {"role": "agent", "text": "Got it! \ud83d\udcdd I'll filter all future searches to **2022 onwards**. \n\nJust give me a topic when you're ready and I'll pull the latest research for you.", "ts": "14:51", "timestamp": "2026-03-08T14:51:49.168456"}
 {"role": "user", "text": "I'm only interested in papers from 2022 onwards", "ts": "14:53", "timestamp": "2026-03-08T14:53:14.837261"}
 {"role": "agent", "text": "Noted! \ud83d\udcdd **2022+ only** \u2014 locked in for all your searches. Just give me a topic and I'll get to work! \ud83d\udd2c", "ts": "14:53", "timestamp": "2026-03-08T14:53:19.575997"}
+{"role": "user", "text": "I'm only interested in papers from 2022 onwards", "ts": "14:55", "timestamp": "2026-03-08T14:55:08.694223"}
+{"role": "agent", "text": "Already set! \ud83d\udc4d All searches will be filtered to **2022 onwards**. \n\nWhenever you have a topic, I'm ready to search.", "ts": "14:55", "timestamp": "2026-03-08T14:55:12.890920"}
