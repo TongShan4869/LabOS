@@ -1102,7 +1102,57 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         _award_xp_backend(10, f"Chat with {agent['name']}")
         _set_agent_status(agent_id, "idle", "")
         socketio.emit("agent_status", {"agent_id": agent_id, "status": "idle", "detail": ""}, to=sid)
+        
+        # Smart memory extraction (async — don't block the reply)
+        mem_thread = threading.Thread(
+            target=_extract_memory,
+            args=(agent_id, agent["name"], text, response),
+            daemon=True,
+        )
+        mem_thread.start()
 
+
+
+def _extract_memory(agent_id: str, agent_name: str, user_msg: str, agent_response: str):
+    """Ask LLM if anything from this conversation is worth remembering."""
+    try:
+        prompt = f"""You are a memory curator for a research lab AI agent called {agent_name}.
+
+Review this conversation exchange and decide if anything is worth saving to long-term memory.
+
+USER said: {user_msg[:500]}
+AGENT replied: {agent_response[:500]}
+
+Worth remembering: corrections, preferences, key decisions, research insights, important facts about the user or their work. 
+
+NOT worth remembering: greetings, small talk, generic questions, things already known.
+
+If something is worth saving, respond with ONLY the memory entry (1-2 concise sentences, no quotes).
+If nothing is worth saving, respond with exactly: NOTHING
+
+Examples of good memory entries:
+- User prefers APA citation style over MLA
+- User's current hypothesis: subcortical encoding is modality-general
+- User corrected: Martinez-Molina 2024 is about music training, not ASD
+- User wants to focus on papers from 2020 onwards for the neural coupling project"""
+
+        result = _run_llm(prompt, max_tokens=150)
+        result = result.strip()
+        
+        if result and result != "NOTHING" and len(result) > 5 and len(result) < 300:
+            # Save to agent memory (markdown)
+            agent_mem_file = AGENTS_MEM_DIR / agent_id / "memory.md"
+            _append_memory_md(agent_mem_file, result)
+            
+            # Also save to LAB_MEMORY.md if it seems globally relevant
+            global_keywords = ["prefer", "always", "never", "style", "format", "field", "hypothesis", "focus", "background", "corrected"]
+            if any(kw in result.lower() for kw in global_keywords):
+                lab_mem_file = BASE_DIR / "LAB_MEMORY.md"
+                _append_memory_md(lab_mem_file, f"[{agent_name}] {result}")
+            
+            print(f"[MEMORY] {agent_name} saved: {result[:80]}")
+    except Exception as e:
+        print(f"[MEMORY] extraction failed: {e}")
 
 # ─── Skill argument extraction ────────────────────────────────────────────────
 
