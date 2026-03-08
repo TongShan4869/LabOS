@@ -619,9 +619,25 @@ def main():
     papers = papers[:args.limit]
 
     # ── Checkpoint: show preview before full summarise ──
-    print(f"\n📋 Found {len(papers)} unique papers. Quick preview:")
+    print(f"\n## 📋 Found {len(papers)} unique papers\n")
     for i, p in enumerate(papers, 1):
-        print(f"  {i}. [{p['relevance_score']:3d}%] {p['title'][:65]} ({p.get('year','?')})")
+        oa = "🔓" if p.get("open_access") else "🔒"
+        authors_str = ", ".join(p.get("authors", []))
+        affs = "; ".join(p.get("affiliations", [])[:2])
+        abstract = p.get("abstract", "")
+        tldr = abstract[:250].rsplit(" ", 1)[0] + "..." if len(abstract) > 250 else abstract
+        
+        print(f"### {i}. [{p['relevance_score']:d}%] {p['title']} ({p.get('year','?')}) {oa}")
+        if authors_str:
+            print(f"**Authors:** {authors_str}")
+        if affs:
+            print(f"**Institutions:** {affs}")
+        print(f"**Journal:** {p.get('journal', '?')} | **Citations:** {p.get('citations', 0)}")
+        if p.get("doi"):
+            print(f"**DOI:** [{p['doi']}](https://doi.org/{p['doi']})")
+        if tldr:
+            print(f"> {tldr}")
+        print()
 
     if not args.no_interactive:
         try:
