@@ -1,3 +1,16 @@
+
+// ── Day/Night background ────────────────────────────────────────────────────
+function updateBackground() {
+  const hour = new Date().getHours();
+  const isNight = hour >= 19 || hour < 7; // 7pm-7am = night
+  const scene = document.getElementById('lab-scene');
+  if (scene) {
+    const bg = isNight ? 'lab-background-night.png' : 'lab-background-day.png';
+    scene.style.backgroundImage = `url('assets/lab/${bg}')`;
+  }
+}
+updateBackground();
+setInterval(updateBackground, 60000); // check every minute
 /**
  * LabOS — Stardew-style research lab UI
  * Click agents to talk. Dialogue box slides up. Typewriter text.
