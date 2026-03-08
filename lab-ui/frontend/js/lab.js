@@ -1071,7 +1071,6 @@ function switchFilingTab(tabName) {
   if (tab) tab.classList.add('active');
   if (content) { content.classList.add('active'); content.style.display = 'block'; }
 
-  console.log('[FILING] switchTab:', tabName, 'content element:', content?.id);
   if (tabName === 'projects') loadProjects();
   else if (tabName === 'reports') loadReports();
   else if (tabName === 'memory') loadMemory();
@@ -1148,23 +1147,18 @@ function createNewProject() {
 }
 
 function loadReports() {
-  console.log('[REPORTS] loadReports called');
   const pid = filingState.activeProjectId;
-  console.log('[REPORTS] pid:', pid);
   const container = document.getElementById('reports-list');
-  console.log('[REPORTS] container:', container);
   if (!container) { console.error('[REPORTS] NO CONTAINER'); return; }
   if (!pid) { container.innerHTML = '<div class="filing-empty">No active project. Select one first.</div>'; return; }
   
   container.innerHTML = '<div class="filing-empty">Loading...</div>';
   
   const url = `/api/projects/${pid}/reports`;
-  console.log('[REPORTS] fetching:', url);
   fetch(url)
     .then(r => { console.log('[REPORTS] response status:', r.status); return r.json(); })
     .then(data => {
-      console.log('[REPORTS] data received, reports:', data.reports?.length);
-      const reports = data.reports || [];
+          const reports = data.reports || [];
       if (reports.length === 0) {
         container.innerHTML = '<div class="filing-empty">No reports yet. Talk to an agent!</div>';
         return;
@@ -1193,8 +1187,7 @@ function loadReports() {
             <div class="report-card-preview">${preview}</div>
           </div>`;
         }).join('');
-      console.log('[REPORTS] rendered', reports.length, 'cards, container innerHTML length:', container.innerHTML.length);
-      // Force visibility
+          // Force visibility
       container.style.display = 'block';
       container.parentElement.style.display = 'block';
     })
