@@ -400,6 +400,8 @@ function handleAgentReply(data) {
 
   appendLocalHistory(agent_id, "agent", text, ts);
   state.waitingReply = false;
+  const agentName = AGENTS[agent_id]?.name || agent_id;
+  addToChatLog(agentName, text.length > 200 ? text.substring(0, 200) + '...' : text);
 
   const LONG_THRESHOLD = 1500;
   const isLong = text.length > LONG_THRESHOLD;

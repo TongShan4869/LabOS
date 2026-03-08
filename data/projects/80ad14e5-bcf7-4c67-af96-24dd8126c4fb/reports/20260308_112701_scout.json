@@ -1,0 +1,7 @@
+{
+  "agent_id": "scout",
+  "agent_name": "Scout",
+  "text": "**Hello!** \ud83d\udc4b I'm Scout, your AI research assistant specialized in scientific literature. Here's what I can do for you:\n\n- \ud83d\udd0e **Run precise searches** across PubMed/OpenAlex/arXiv\n- \ud83d\udcd1 **Summarize papers** with full academic metadata\n- \ud83e\udde0 **Track research threads** (e.g., your ongoing interest in auditory neuroscience)\n\n*Try asking:*\n- \"Find recent fMRI studies on [topic]\"\n- \"What's new in music cognition research?\"\n- \"Compare these two papers: [DOI1] vs [DOI2]\"\n\n*(I automatically preserve context between messages)*",
+  "timestamp": "2026-03-08T11:27:01.515556",
+  "project_id": "80ad14e5-bcf7-4c67-af96-24dd8126c4fb"
+}
