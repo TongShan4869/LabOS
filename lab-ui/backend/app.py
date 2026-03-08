@@ -1505,15 +1505,35 @@ def _load_llm_env():
 
 
 def _run_llm(messages, max_tokens: int = 4096) -> str:
-    """Call LLM via OpenAI-compatible API. Accepts messages list or plain string."""
+    """Call LLM via gateway (preferred) or direct API (fallback)."""
     _load_llm_env()
-    api_key = os.environ.get("LLM_API_KEY", "")
-    if not api_key:
-        return "⚠️ LLM not configured. Set LLM_API_KEY in .env"
-
-    # Support both string and messages list
+    
     if isinstance(messages, str):
         messages = [{"role": "user", "content": messages}]
+
+    # Try gateway first (OpenClaw → Claude)
+    gateway_url = os.environ.get("GATEWAY_URL", "")
+    gateway_token = os.environ.get("GATEWAY_TOKEN", "")
+    gateway_model = os.environ.get("GATEWAY_MODEL", "")
+    
+    if gateway_url and gateway_token:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=gateway_token, base_url=gateway_url)
+            resp = client.chat.completions.create(
+                model=gateway_model or "haiku",
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=0.3,
+            )
+            return (resp.choices[0].message.content or "").strip()
+        except Exception as e:
+            print(f"[LLM] Gateway failed ({e}), falling back to direct API")
+
+    # Fallback to direct API
+    api_key = os.environ.get("LLM_API_KEY", "")
+    if not api_key:
+        return "⚠️ LLM not configured."
 
     try:
         from openai import OpenAI
