@@ -144,6 +144,7 @@ AGENTS = {
         "name":     "Quill",
         "role":     "Writing Assistant",
         "skill":    "lab-writing-assistant",
+        "skills":   ["lab-writing-assistant", "lab-publishing-assistant"],
         "emoji":    "✍️",
         "zone":     "desk",
         "color":    "#e9c46a",
@@ -250,23 +251,30 @@ RULES:
 - Explain statistical concepts in accessible terms
 - Only run analysis when actually needed — chat about stats freely""",
 
-    "quill": """You are Quill, the Writing Assistant in LabOS.
+    "quill": """You are Quill, the Writing & Publishing Assistant in LabOS.
 
 CAPABILITIES:
 - Draft academic sections (intro, methods, results, discussion, abstract)
 - Grant proposals and cover letters
 - Response to reviewers
+- Journal selection and submission preparation
+- Manuscript reformatting for target journals
+- Submission checklists and reference formatting
 
-TOOL: To generate a draft:
+TOOL 1 - WRITING: To generate a draft:
 [TOOL_CALL]{"tool": "draft", "args": {"section": "abstract", "project": "..."}}[/TOOL_CALL]
+Available args: section (intro|abstract|methods|results|discussion|grant-aim|cover-letter|response-to-reviewers), project, draft (path)
 
-Available args: section (required: intro|abstract|methods|results|discussion|grant-aim|cover-letter|response-to-reviewers), project, draft (path), notes
+TOOL 2 - PUBLISHING: To run publishing tasks:
+[TOOL_CALL]{"tool": "publish", "args": {"mode": "find-journal", "project": "..."}}[/TOOL_CALL]
+Available args: mode (find-journal|reformat|checklist|references|cover-letter), project, draft (path), target (journal name)
 
 RULES:
 - Discuss the outline and approach before drafting
 - If they say "make it shorter" or "add more detail", work with existing draft from history
-- Only run the tool when you need to generate NEW text
-- Be collaborative — you're a writing partner, not a ghostwriter""",
+- Only run the tool when you need to generate NEW text or run publishing tasks
+- Be collaborative — you're a writing partner, not a ghostwriter
+- For journal selection, ask about impact factor preferences, open access needs, and timeline""",
 
     "sage": """You are Sage, the Research Advisor in LabOS.
 
@@ -1084,15 +1092,27 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     # Check if agent wants to run a skill
     has_tool_call = "[RUN_SKILL]" in response or "[TOOL_CALL]" in response
     if has_tool_call and skill:
-        # Agent decided to use its skill — run it
+        # Agent decided to use its skill — determine which one
         import re
+        
+        # For agents with multiple skills, detect which tool was called
+        active_skill = skill
+        if agent.get("skills"):
+            tool_match = re.search(r'"tool"\s*:\s*"(\w+)"', response)
+            if tool_match:
+                tool_name = tool_match.group(1)
+                skill_map = {"draft": "lab-writing-assistant", "publish": "lab-publishing-assistant",
+                             "search": "lab-lit-scout", "advise": "lab-research-advisor"}
+                active_skill = skill_map.get(tool_name, skill)
+                print(f"[AGENT] Multi-skill agent: tool={tool_name} → {active_skill}", flush=True)
+        
         # Strip tool call markers and JSON
         clean_response = re.sub(r'\[/?TOOL_CALL\].*?(?=\[/TOOL_CALL\]|$)', '', response, flags=re.DOTALL)
         clean_response = re.sub(r'\[/?TOOL_CALL\]', '', clean_response)
         clean_response = clean_response.replace("[RUN_SKILL]", "").strip()
         if clean_response:
             _emit_agent_reply(agent_id, agent, clean_response + "\n\n⏳ Running skill...", sid)
-        _run_skill_interactive(agent_id, agent, skill, text, sid)
+        _run_skill_interactive(agent_id, agent, active_skill, text, sid)
     else:
         # Pure conversational response
         _emit_agent_reply(agent_id, agent, response, sid)
