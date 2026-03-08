@@ -756,6 +756,11 @@ dlgClose.addEventListener("click", closeDialogue);
 dlgText.addEventListener("click", skipTypewriter);
 dlgCursor.addEventListener("click", skipTypewriter);
 
+$("history-toggle").addEventListener("click", (e) => {
+  e.stopPropagation();
+  dlgHistory.classList.toggle("visible");
+});
+
 // Click outside dialogue to close
 dlgOverlay.addEventListener("click", (e) => {
   if (e.target === dlgOverlay) closeDialogue();
