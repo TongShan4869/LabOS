@@ -1600,9 +1600,14 @@ def _run_llm(messages, max_tokens: int = 4096) -> str:
                 max_tokens=max_tokens,
                 temperature=0.3,
             )
-            return (resp.choices[0].message.content or "").strip()
+            result = (resp.choices[0].message.content or "").strip()
+            if not result:
+                print(f"[LLM] Gateway returned empty response", flush=True)
+                return "Hmm, I didn't have anything to say to that. Ask me something specific!"
+            print(f"[LLM] Gateway OK: {result[:80]}...", flush=True)
+            return result
         except Exception as e:
-            print(f"[LLM] Gateway failed ({e}), falling back to direct API")
+            print(f"[LLM] Gateway failed ({e}), falling back to direct API", flush=True)
 
     # Fallback to direct API
     api_key = os.environ.get("LLM_API_KEY", "")
