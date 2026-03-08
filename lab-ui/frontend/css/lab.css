@@ -1069,7 +1069,6 @@ body {
 
 /* ─── Filing Cabinet ────────────────────────────────────────────────────────── */
 
-#filing-overlay.hidden { display: none; }
 
 #filing-overlay {
   position: fixed;
@@ -1079,7 +1078,7 @@ body {
   height: 100%;
   background: rgba(0,0,0,0.7);
   z-index: 200;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: flex-start;
   padding: 20px;
