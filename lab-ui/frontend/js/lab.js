@@ -1083,6 +1083,7 @@ function switchFilingTab(tabName) {
   if (tab) tab.classList.add('active');
   if (content) { content.classList.add('active'); content.style.display = 'block'; }
 
+  console.log('[FILING] switchTab:', tabName, 'content element:', content?.id);
   if (tabName === 'projects') loadProjects();
   else if (tabName === 'reports') loadReports();
   else if (tabName === 'memory') loadMemory();
@@ -1159,42 +1160,35 @@ function createNewProject() {
 }
 
 function loadReports() {
-  if (!filingState.activeProjectId) return;
-  fetch(`/api/projects/${filingState.activeProjectId}/reports`)
+  const pid = filingState.activeProjectId;
+  const container = document.getElementById('reports-list');
+  if (!container) return;
+  if (!pid) { container.innerHTML = '<div class="filing-empty">No active project. Select one first.</div>'; return; }
+  
+  container.innerHTML = '<div class="filing-empty">Loading...</div>';
+  
+  fetch(`/api/projects/${pid}/reports`)
     .then(r => r.json())
     .then(data => {
-      const container = document.getElementById('reports-list');
-      if (!container) return;
-      
       const reports = data.reports || [];
       if (reports.length === 0) {
         container.innerHTML = '<div class="filing-empty">No reports yet. Talk to an agent!</div>';
         return;
       }
       
-      // Group by date
-      const grouped = {};
-      reports.forEach(r => {
-        const date = new Date(r.timestamp).toLocaleDateString();
-        (grouped[date] = grouped[date] || []).push(r);
-      });
-      
-      container.innerHTML = Object.entries(grouped)
-        .sort(([a], [b]) => new Date(b) - new Date(a))
-        .map(([date, items]) => `
-          <div class="report-group-date">${date}</div>
-          ${items.map(r => {
-            const agent = AGENTS[r.agent_id] || { emoji: '❓', name: 'Unknown' };
-            const preview = (r.text || '').substring(0, 100) + ((r.text || '').length > 100 ? '...' : '');
-            const time = new Date(r.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            return `<div class="report-card" onclick="openReportFromFiling('${esc(r.agent_id)}', '${esc(r.timestamp)}')">
-              <div class="report-card-header">${agent.emoji} ${esc(agent.name)} · ${time}</div>
-              <div class="report-card-preview">${esc(preview)}</div>
-            </div>`;
-          }).join('')}
-        `).join('');
+      container.innerHTML = reports
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .map(r => {
+          const agent = AGENTS[r.agent_id] || { emoji: '❓', name: 'Unknown' };
+          const preview = (r.text || '').substring(0, 120).replace(/[<>&]/g, '') + '...';
+          const time = new Date(r.timestamp).toLocaleString();
+          return `<div class="report-card" onclick="openReportFromFiling('${r.agent_id}','${r.timestamp}')">
+            <div class="report-card-header">${agent.emoji} ${agent.name} · ${time}</div>
+            <div class="report-card-preview">${preview}</div>
+          </div>`;
+        }).join('');
     })
-    .catch(err => console.error('loadReports error:', err));
+    .catch(err => { container.innerHTML = '<div class="filing-empty">Error loading reports.</div>'; console.error(err); });
 }
 
 function openReportFromFiling(agentId, timestamp) {
