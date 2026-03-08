@@ -660,10 +660,10 @@ function storeReport(agentId, text, ts) {
 
 function updateReportsButton() {
   if (state.reports.length > 0) {
-    hudReports.classList.remove("hidden");
-    hudReportsCount.textContent = state.reports.length;
+    hudReports?.classList.remove("hidden");
+    if (hudReportsCount) hudReportsCount.textContent = state.reports.length;
   } else {
-    hudReports.classList.add("hidden");
+    hudReports?.classList.add("hidden");
   }
 }
 
@@ -715,7 +715,7 @@ function toggleReportsList() {
   }, 10);
 }
 
-hudReports.addEventListener("click", toggleReportsList);
+hudReports?.addEventListener("click", toggleReportsList);
 
 // ── Report panel ──────────────────────────────────────────────────────────────
 
