@@ -921,13 +921,26 @@ function showXpModal() {
       
       $('xp-current-level').textContent = xp.level;
       $('xp-current-title').textContent = xp.level_title;
-      $('xp-current').textContent = xp.xp;
+      $('xp-current').textContent = xp.xp_in_level || xp.xp;
       
-      const nextLevelXp = xp.level * 100;
+      const nextLevelXp = xp.xp_to_next || (xp.level * 150);
       $('xp-next-level').textContent = nextLevelXp;
       
-      const progress = Math.min((xp.xp / nextLevelXp) * 100, 100);
+      const inLevel = xp.xp_in_level || xp.xp;
+      const progress = Math.min((inLevel / nextLevelXp) * 100, 100);
       $('xp-modal-bar').style.width = progress + '%';
+      
+      // Show all level titles
+      const levelsEl = $('xp-levels-list');
+      if (levelsEl && xp.levels) {
+        levelsEl.innerHTML = Object.entries(xp.levels)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([lvl, title]) => {
+            const current = Number(lvl) === xp.level;
+            return `<div class="xp-level-row ${current ? 'xp-level-current' : ''} ${Number(lvl) < xp.level ? 'xp-level-past' : ''}">` +
+              `Level ${lvl}: ${title}</div>`;
+          }).join('');
+      }
       
       // Update badges
       const badgesContainer = $('xp-badges');

@@ -1532,3 +1532,9 @@ body {
 #report-body table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9px; }
 #report-body th, #report-body td { border: 1px solid rgba(255,255,255,0.2); padding: 4px 8px; text-align: left; }
 #report-body th { background: rgba(0,0,0,0.3); color: var(--gold); }
+
+/* XP Level rows */
+.xp-level-row { padding: 4px 8px; font-size: 10px; opacity: 0.5; }
+.xp-level-current { color: var(--gold); opacity: 1; font-weight: bold; font-size: 11px; }
+.xp-level-current::before { content: '▶ '; }
+.xp-level-past { opacity: 0.7; text-decoration: line-through; }

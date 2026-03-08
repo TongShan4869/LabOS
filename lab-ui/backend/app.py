@@ -637,13 +637,47 @@ def load_agents_state() -> dict:
     return {}
 
 
+LEVEL_TITLES = {
+    1: "Confused First-Year",
+    2: "Lab Gremlin",
+    3: "Coffee-Powered Postgrad",
+    4: "Data Whisperer",
+    5: "Methods Wizard",
+    6: "Manuscript Maestro",
+    7: "Grant Guru",
+    8: "Peer Review Survivor",
+    9: "Tenured Legend",
+    10: "Nobel-Bound",
+    11: "Cited More Than Darwin",
+    12: "The Field IS You",
+    13: "Beyond Peer Review 🌌",
+}
+
+def _calc_level(xp: int) -> tuple:
+    level = 1
+    cumulative = 0
+    while True:
+        needed = level * 150
+        if cumulative + needed > xp:
+            return level, LEVEL_TITLES.get(level, f"Level {level}"), needed, cumulative
+        cumulative += needed
+        level += 1
+
 def load_xp() -> dict:
+    data = {"xp": 0, "level": 1, "level_title": "Confused First-Year", "badges": []}
     if XP_FILE.exists():
         try:
-            return json.loads(XP_FILE.read_text())
+            data = json.loads(XP_FILE.read_text())
         except Exception:
             pass
-    return {"xp": 0, "level": 1, "level_title": "Confused First-Year", "badges": []}
+    # Always recalculate level from total XP
+    level, title, xp_next, xp_cumulative = _calc_level(data.get("xp", 0))
+    data["level"] = level
+    data["level_title"] = title
+    data["xp_to_next"] = xp_next
+    data["xp_in_level"] = data.get("xp", 0) - xp_cumulative
+    data["levels"] = {str(k): v for k, v in LEVEL_TITLES.items()}
+    return data
 
 
 def get_lab_status() -> dict:

@@ -350,13 +350,53 @@ def call_llm(prompt: str, model: str | None = None) -> str:
 
 # ─── XP ───────────────────────────────────────────────────────────────────────
 
+LEVEL_TITLES = {
+    1: "Confused First-Year",
+    2: "Lab Gremlin",
+    3: "Coffee-Powered Postgrad",
+    4: "Data Whisperer",
+    5: "Methods Wizard",
+    6: "Manuscript Maestro",
+    7: "Grant Guru",
+    8: "Peer Review Survivor",
+    9: "Tenured Legend",
+    10: "Nobel-Bound",
+    11: "Cited More Than Darwin",
+    12: "The Field IS You",
+    13: "Beyond Peer Review 🌌",
+}
+
+def calc_level(xp: int) -> tuple[int, str, int]:
+    """Returns (level, title, xp_for_next_level). Each level = level * 150 XP."""
+    level = 1
+    cumulative = 0
+    while True:
+        needed = level * 150  # Level 1: 150, Level 2: 300, Level 3: 450...
+        if cumulative + needed > xp:
+            return level, LEVEL_TITLES.get(level, f"Level {level}"), needed
+        cumulative += needed
+        level += 1
+
+
 def award_xp(amount: int, badge: str | None = None) -> dict:
     """Award XP and optionally a one-time badge. Returns updated xp_data."""
     xp_data = load_xp()
+    old_level = xp_data.get("level", 1)
     xp_data["xp"] = xp_data.get("xp", 0) + amount
+    
+    # Recalculate level
+    level, title, xp_next = calc_level(xp_data["xp"])
+    xp_data["level"] = level
+    xp_data["level_title"] = title
+    xp_data["xp_to_next"] = xp_next
+    
     if badge and badge not in xp_data.get("badges", []):
         xp_data.setdefault("badges", []).append(badge)
         print(f"🏅 Badge unlocked: {badge}")
+    
+    if level > old_level:
+        print(f"🎉 LEVEL UP! {old_level} → {level}: {title}")
+    
     save_xp(xp_data)
     print(f"✨ +{amount} XP  (total: {xp_data['xp']})")
     return xp_data
