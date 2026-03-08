@@ -1120,6 +1120,7 @@ function activateProject(projectId) {
   fetch(`/api/projects/${projectId}/activate`, { method: 'PUT' })
     .then(r => r.json())
     .then(() => {
+      filingState.activeProjectId = projectId;
       loadProjects();
       showToast('Project activated!');
     })
