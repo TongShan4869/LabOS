@@ -1599,3 +1599,21 @@ body {
   width: 100%;
   box-sizing: border-box;
 }
+
+/* Report card title */
+.report-card-title {
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: bold;
+  margin: 4px 0;
+  line-height: 1.4;
+}
+.report-card-header {
+  font-size: 8px;
+  opacity: 0.7;
+}
+.report-card-preview {
+  font-size: 8px;
+  opacity: 0.5;
+  line-height: 1.3;
+}

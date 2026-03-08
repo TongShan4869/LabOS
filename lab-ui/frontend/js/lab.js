@@ -1186,10 +1186,22 @@ function loadReports() {
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .map(r => {
           const agent = AGENTS[r.agent_id] || { emoji: '❓', name: 'Unknown' };
-          const preview = (r.text || '').substring(0, 120).replace(/[<>&]/g, '') + '...';
-          const time = new Date(r.timestamp).toLocaleString();
+          const text = r.text || '';
+          // Extract title: first markdown heading, or first bold text, or first line
+          let title = '';
+          const headingMatch = text.match(/^#{1,3}\s+(.+)/m);
+          const boldMatch = text.match(/\*\*([^*]{10,80})\*\*/);
+          if (headingMatch) title = headingMatch[1].replace(/[*#]/g, '').trim();
+          else if (boldMatch) title = boldMatch[1].trim();
+          else title = text.substring(0, 60).split('\n')[0];
+          if (title.length > 70) title = title.substring(0, 67) + '...';
+          
+          const preview = text.substring(0, 100).replace(/[<>&*#]/g, '').trim() + '...';
+          const time = new Date(r.timestamp).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+          const date = new Date(r.timestamp).toLocaleDateString('en-US', {month:'short', day:'numeric'});
           return `<div class="report-card" onclick="openReportFromFiling('${r.agent_id}','${r.timestamp}')">
-            <div class="report-card-header">${agent.emoji} ${agent.name} · ${time}</div>
+            <div class="report-card-header">${agent.emoji} ${agent.name} · ${date} ${time}</div>
+            <div class="report-card-title">${title}</div>
             <div class="report-card-preview">${preview}</div>
           </div>`;
         }).join('');
