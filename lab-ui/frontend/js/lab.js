@@ -989,6 +989,7 @@ const chatLogMessages = [];
 function openChatLog() {
   const overlay = $('chatlog-overlay');
   const msgs = $('chatlog-messages');
+  overlay.classList.remove('hidden');
   overlay.style.display = 'flex';
   msgs.innerHTML = chatLogMessages.length === 0
     ? '<div class="filing-empty">No messages yet. Talk to an agent!</div>'
@@ -1038,7 +1039,7 @@ function initFilingCabinet() {
 
 function showFilingCabinet() {
   const overlay = document.getElementById('filing-overlay');
-  overlay.style.display = 'flex';
+  overlay.classList.remove('hidden');
   overlay.style.display = 'flex';
   filingState.open = true;
   // Always fetch active project first
