@@ -181,6 +181,45 @@ LabOS classifies all research data with sensitivity levels:
 
 ---
 
+## 🖥️ Pixel Lab UI
+
+LabOS includes an optional **Stardew Valley-style pixel art interface** — a browser-based virtual lab where your agents walk around as animated sprites.
+
+### Features
+- 🎮 **8 animated pixel agents** with idle/clicked/working animations
+- 💬 **RPG-style dialogue system** — click an agent to chat, typewriter text, paginated responses
+- 📂 **Filing Cabinet** — browse projects, reports, and agent memories
+- 📜 **Chat Log** — session-based conversation history
+- 🏆 **XP & Leveling** — 15 levels from "Confused First-Year" to "The Omniscient and Omnipotent Being of the Universe 🌌"
+- 📋 **Report Panel** — slide-in panel for long outputs with full Markdown rendering
+- 🔔 **Background notifications** — red badge on agent sprites when results are ready
+- ✅ **Interactive checkpoints** — agents ask for confirmation before expensive operations
+
+### How It Works
+
+```
+Browser (Pixel Lab)
+  ↕ WebSocket (Socket.IO)
+Flask Backend (app.py)
+  ↕ OpenAI-compatible API
+OpenClaw Gateway (Claude) ← primary
+  or GMI Cloud (DeepSeek V3) ← fallback
+```
+
+**Agents are powered by Claude via the OpenClaw gateway** — when you talk to Scout or Sage in the pixel lab, you're talking to Claude (Haiku). The gateway handles auth, model routing, and rate limiting. If the gateway is unavailable, it falls back to DeepSeek V3 via direct API.
+
+### Running the UI
+
+```bash
+cd lab-ui
+pip install flask flask-socketio
+python backend/app.py  # Starts on port 18792
+```
+
+Then open `http://localhost:18792` or tunnel with Cloudflare.
+
+---
+
 ## 🗺️ Roadmap
 
 **MVP (current):** All 9 skills above
