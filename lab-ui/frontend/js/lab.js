@@ -1,8 +1,3 @@
-
-// DEBUG: find what's blocking clicks
-document.addEventListener("click", (e) => {
-  console.log("[CLICK DEBUG]", e.target.tagName, e.target.id || e.target.className, "z-index:", getComputedStyle(e.target).zIndex, "display:", getComputedStyle(e.target).display);
-}, true);
 /**
  * LabOS — Stardew-style research lab UI
  * Click agents to talk. Dialogue box slides up. Typewriter text.
@@ -482,6 +477,7 @@ function appendLocalHistory(agentId, role, text, ts) {
 
 function renderHistory(agentId) {
   const hist = getLocalHistory(agentId);
+  if (!dlgHistory) return;
   dlgHistory.innerHTML = "";
   const agent = AGENTS[agentId];
   for (const msg of hist) {
