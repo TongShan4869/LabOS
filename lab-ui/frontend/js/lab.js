@@ -243,6 +243,10 @@ function _typewritePage(text, onDone) {
       dlgText.textContent += chars[i++];
       state.typewriterTimer = setTimeout(tick, speed);
     } else {
+      // Render markdown after typewriter finishes
+      if (typeof marked !== 'undefined') {
+        dlgText.innerHTML = marked.parse(text);
+      }
       state.isTyping = false;
       if (onDone) onDone();
     }
@@ -938,6 +942,7 @@ function showLoadingScreen(labName) {
 
 function showXpModal() {
   const overlay = $('xp-modal-overlay');
+  overlay.classList.remove('hidden');
   overlay.style.display = 'flex';
   
   // Load XP data from state

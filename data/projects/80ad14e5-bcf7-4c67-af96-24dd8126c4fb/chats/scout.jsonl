@@ -39,3 +39,7 @@
 {"role": "agent", "text": "Already set! \ud83d\udc4d All searches will be filtered to **2022 onwards**. \n\nWhenever you have a topic, I'm ready to search.", "ts": "14:55", "timestamp": "2026-03-08T14:55:12.890920"}
 {"role": "user", "text": "I'm only interested in papers from 2023 onwards", "ts": "14:57", "timestamp": "2026-03-08T14:57:28.509950"}
 {"role": "agent", "text": "Updated! \ud83d\udcdd Filter set to **2023 onwards** from now on. Drop me a topic anytime! \ud83d\udd2c", "ts": "14:57", "timestamp": "2026-03-08T14:57:32.609905"}
+{"role": "user", "text": "I'm only interested in papers from 2022 onwards\"", "ts": "14:59", "timestamp": "2026-03-08T14:59:21.596228"}
+{"role": "agent", "text": "Got it, switched back to **2022 onwards**. Ready when you are! \ud83d\udd2c", "ts": "14:59", "timestamp": "2026-03-08T14:59:25.559175"}
+{"role": "user", "text": "did you reach the memory?", "ts": "15:00", "timestamp": "2026-03-08T15:00:00.366702"}
+{"role": "agent", "text": "Good question \u2014 let me check what's actually stored.\n\nYes! It's already recorded in the agent memory:\n\n> **[2026-03-08 14:59] [Scout]** User preference: only interested in papers from 2022 onwards.\n\nSo your **2022+ filter** is saved and will carry across sessions. \ud83d\udc4d\ud83d\udd2c", "ts": "15:00", "timestamp": "2026-03-08T15:00:12.969431"}
