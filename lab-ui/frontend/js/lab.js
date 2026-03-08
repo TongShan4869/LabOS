@@ -1170,9 +1170,12 @@ function loadReports() {
   
   container.innerHTML = '<div class="filing-empty">Loading...</div>';
   
-  fetch(`/api/projects/${pid}/reports`)
-    .then(r => r.json())
+  const url = `/api/projects/${pid}/reports`;
+  console.log('[REPORTS] fetching:', url);
+  fetch(url)
+    .then(r => { console.log('[REPORTS] response status:', r.status); return r.json(); })
     .then(data => {
+      console.log('[REPORTS] data received, reports:', data.reports?.length);
       const reports = data.reports || [];
       if (reports.length === 0) {
         container.innerHTML = '<div class="filing-empty">No reports yet. Talk to an agent!</div>';
