@@ -485,6 +485,7 @@ function renderHistory(agentId) {
     const who = msg.role === "user" ? "You" : agent.name;
     div.innerHTML = `<span class="msg-who">${who} [${msg.ts}]</span>${escapeHtml(msg.text)}`;
     dlgHistory.appendChild(div);
+    addToChatLog(who, msg.text);
   }
   dlgHistory.scrollTop = dlgHistory.scrollHeight;
 }
@@ -503,12 +504,10 @@ function updateHud(status) {
   hudLevel.textContent = `Lv${xp.level || 1} — ${title}`;
   hudXp.textContent    = `${total} XP`;
 
-  // XP bar fill — approximate next threshold
-  const thresholds = [0,300,800,2000,4000,7500,12000,20000,30000,45000];
-  const lvl = (xp.level || 1) - 1;
-  const lo  = thresholds[lvl] || 0;
-  const hi  = thresholds[lvl + 1] || lo + 500;
-  const pct = Math.min(100, Math.round(((total - lo) / (hi - lo)) * 100));
+  // XP bar fill — use backend-calculated values
+  const inLevel = xp.xp_in_level || 0;
+  const toNext = xp.xp_to_next || 150;
+  const pct = Math.min(100, Math.round((inLevel / toNext) * 100));
   xpBar.style.width = `${pct}%`;
 
   hudTime.textContent = status.time || "--:--";
@@ -756,10 +755,7 @@ dlgClose.addEventListener("click", closeDialogue);
 dlgText.addEventListener("click", skipTypewriter);
 dlgCursor.addEventListener("click", skipTypewriter);
 
-$("history-toggle").addEventListener("click", (e) => {
-  e.stopPropagation();
-  dlgHistory.classList.toggle("visible");
-});
+
 
 // Click outside dialogue to close
 dlgOverlay.addEventListener("click", (e) => {
@@ -995,6 +991,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const filingState = { open: false, memoryType: null, activeProjectId: null };
 
+// ─── Chat Log Panel ─────────────────────────────────────────────────────────
+
+const chatLogMessages = [];
+
+function openChatLog() {
+  const overlay = $('chatlog-overlay');
+  const msgs = $('chatlog-messages');
+  overlay.classList.remove('hidden');
+  msgs.innerHTML = chatLogMessages.length === 0
+    ? '<div class="filing-empty">No messages yet. Talk to an agent!</div>'
+    : chatLogMessages.map(m =>
+        `<div class="chatlog-msg"><span class="chatlog-who">${m.who}</span> <span class="chatlog-time">${m.ts}</span><br>${m.text}</div>`
+      ).join('');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function closeChatLog() {
+  $('chatlog-overlay').classList.add('hidden');
+}
+
+function addToChatLog(who, text) {
+  chatLogMessages.push({ who, text, ts: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) });
+}
+
+$('hud-chatlog')?.addEventListener('click', openChatLog);
+$('chatlog-close')?.addEventListener('click', closeChatLog);
+$('chatlog-overlay')?.addEventListener('click', (e) => {
+  if (e.target.id === 'chatlog-overlay') closeChatLog();
+});
+
 function initFilingCabinet() {
   const el = (id) => document.getElementById(id);
   
@@ -1036,11 +1062,14 @@ function closeFilingCabinet() {
 
 function switchFilingTab(tabName) {
   document.querySelectorAll('.filing-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.filing-tab-content').forEach(c => c.classList.add('hidden'));
+  document.querySelectorAll('.filing-tab-content').forEach(c => {
+    c.classList.remove('active');
+    c.style.display = 'none';
+  });
   const tab = document.querySelector(`.filing-tab[data-tab="${tabName}"]`);
   const content = document.getElementById(`filing-tab-${tabName}`);
   if (tab) tab.classList.add('active');
-  if (content) content.classList.remove('hidden');
+  if (content) { content.classList.add('active'); content.style.display = 'block'; }
 
   if (tabName === 'projects') loadProjects();
   else if (tabName === 'reports') loadReports();
