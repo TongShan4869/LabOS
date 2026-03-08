@@ -976,17 +976,7 @@ function closeXpModal() {
 
 // ── Event Listeners ────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Check if onboarding needed
-  checkOnboardingNeeded();
-  
-  // XP modal listeners
-  $('hud-left').addEventListener('click', showXpModal);
-  $('xp-modal-close').addEventListener('click', closeXpModal);
-  $('xp-modal-overlay').addEventListener('click', (e) => {
-    if (e.target === $('xp-modal-overlay')) closeXpModal();
-  });
-});
+// XP/Filing/Chatlog listeners moved to consolidated DOMContentLoaded below
 
 // ─── Filing Cabinet ─────────────────────────────────────────────────────────
 
@@ -1329,10 +1319,19 @@ function esc(s) {
 
 // Initialize filing cabinet on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-  initFilingCabinet();
-  $('hud-chatlog')?.addEventListener('click', openChatLog);
-  $('chatlog-close')?.addEventListener('click', closeChatLog);
-  $('chatlog-overlay')?.addEventListener('click', (e) => {
-    if (e.target.id === 'chatlog-overlay') closeChatLog();
-  });
+  try {
+    checkOnboardingNeeded();
+    $('hud-left')?.addEventListener('click', showXpModal);
+    $('xp-modal-close')?.addEventListener('click', closeXpModal);
+    $('xp-modal-overlay')?.addEventListener('click', (e) => {
+      if (e.target === $('xp-modal-overlay')) closeXpModal();
+    });
+    initFilingCabinet();
+    $('hud-chatlog')?.addEventListener('click', openChatLog);
+    $('chatlog-close')?.addEventListener('click', closeChatLog);
+    $('chatlog-overlay')?.addEventListener('click', (e) => {
+      if (e.target.id === 'chatlog-overlay') closeChatLog();
+    });
+    console.log('[INIT] All UI listeners registered');
+  } catch(e) { console.error('[INIT] Error:', e); }
 });
