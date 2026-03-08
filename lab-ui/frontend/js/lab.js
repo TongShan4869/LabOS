@@ -912,7 +912,7 @@ function showLoadingScreen(labName) {
 
 function showXpModal() {
   const overlay = $('xp-modal-overlay');
-  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
   
   // Load XP data from state
   fetch('/api/status')
@@ -968,7 +968,7 @@ function showXpModal() {
 }
 
 function closeXpModal() {
-  $('xp-modal-overlay').classList.add('hidden');
+  $('xp-modal-overlay').style.display = 'none';
 }
 
 // ── Event Listeners ────────────────────────────────────────────────────────
@@ -981,9 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('hud-left').addEventListener('click', showXpModal);
   $('xp-modal-close').addEventListener('click', closeXpModal);
   $('xp-modal-overlay').addEventListener('click', (e) => {
-    if (e.target === $('xp-modal-overlay')) {
-      closeXpModal();
-    }
+    if (e.target === $('xp-modal-overlay')) closeXpModal();
   });
 });
 
@@ -998,7 +996,7 @@ const chatLogMessages = [];
 function openChatLog() {
   const overlay = $('chatlog-overlay');
   const msgs = $('chatlog-messages');
-  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
   msgs.innerHTML = chatLogMessages.length === 0
     ? '<div class="filing-empty">No messages yet. Talk to an agent!</div>'
     : chatLogMessages.map(m =>
@@ -1008,7 +1006,7 @@ function openChatLog() {
 }
 
 function closeChatLog() {
-  $('chatlog-overlay').classList.add('hidden');
+  $('chatlog-overlay').style.display = 'none';
 }
 
 function addToChatLog(who, text) {
@@ -1051,7 +1049,7 @@ function initFilingCabinet() {
 
 function showFilingCabinet() {
   const overlay = document.getElementById('filing-overlay');
-  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
   overlay.style.display = 'flex';
   filingState.open = true;
   // Always fetch active project first
