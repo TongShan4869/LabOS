@@ -1080,6 +1080,8 @@ When asked "what can you do?", explain your role and capabilities in plain text.
             _save_report(active_proj, agent_id, agent["name"], response)
         # Award XP for agent conversation
         _award_xp_backend(10, f"Chat with {agent['name']}")
+        _set_agent_status(agent_id, "idle", "")
+        socketio.emit("agent_status", {"agent_id": agent_id, "status": "idle", "detail": ""}, to=sid)
 
 
 # ─── Skill argument extraction ────────────────────────────────────────────────

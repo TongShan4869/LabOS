@@ -423,6 +423,7 @@ function handleAgentReply(data) {
 
   appendLocalHistory(agent_id, "agent", text, ts);
   state.waitingReply = false;
+  updateAgentStatus(agent_id, "idle", "");
   const agentName = AGENTS[agent_id]?.name || agent_id;
   addToChatLog(agentName, text.length > 200 ? text.substring(0, 200) + '...' : text);
 
