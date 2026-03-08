@@ -1051,8 +1051,20 @@ function initFilingCabinet() {
 
 function showFilingCabinet() {
   const overlay = document.getElementById('filing-overlay');
-  if (overlay) { overlay.classList.remove('hidden'); filingState.open = true; }
-  loadProjects();
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  filingState.open = true;
+  // Always fetch active project first
+  fetch('/api/projects')
+    .then(r => r.json())
+    .then(data => {
+      filingState.activeProjectId = data.active_project_id;
+      // Load whichever tab is active
+      const activeTab = document.querySelector('.filing-tab.active');
+      const tabName = activeTab ? activeTab.dataset.tab : 'projects';
+      switchFilingTab(tabName);
+    })
+    .catch(() => loadProjects());
 }
 
 function closeFilingCabinet() {
