@@ -609,8 +609,8 @@ def _get_combined_memory(agent_id: str) -> str:
     lab_memory_file = BASE_DIR / "LAB_MEMORY.md"
     lab_memory = _load_memory_md(lab_memory_file)
     if lab_memory:
-        # Get last ~500 chars to keep context window reasonable
-        recent = lab_memory[-500:] if len(lab_memory) > 500 else lab_memory
+        # Inject full lab memory (markdown is compact enough)
+        recent = lab_memory
         parts.append("## Lab Memory (Cross-Project):\n" + recent)
     
     return "\n\n".join(parts) if parts else ""
