@@ -1193,6 +1193,10 @@ function loadReports() {
             <div class="report-card-preview">${preview}</div>
           </div>`;
         }).join('');
+      console.log('[REPORTS] rendered', reports.length, 'cards, container innerHTML length:', container.innerHTML.length);
+      // Force visibility
+      container.style.display = 'block';
+      container.parentElement.style.display = 'block';
     })
     .catch(err => { container.innerHTML = '<div class="filing-empty">Error loading reports.</div>'; console.error(err); });
 }
