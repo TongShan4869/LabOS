@@ -236,6 +236,8 @@ Then open `http://localhost:18792` or tunnel with Cloudflare.
 
 ## 📄 Documentation
 
+- [**Getting Started Guide**](docs/getting-started.md) — Set up your own LabOS in under 10 minutes
+
 - [`PRD.md`](PRD.md) — Full product requirements document (living document)
 - [`docs/lit-scout-architecture.md`](docs/lit-scout-architecture.md) — Literature Scout search pipeline, semantic scoring strategy, and report format
 - Each skill has its own `SKILL.md` (activation) and `script.md` (execution logic)
