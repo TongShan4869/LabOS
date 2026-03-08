@@ -1108,6 +1108,7 @@ body {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   animation: slideInLeft 0.3s ease-out;
 }
 
@@ -1204,6 +1205,9 @@ body {
 
 .filing-tab-content.active {
   display: block;
+  overflow-y: auto;
+  max-height: calc(90vh - 120px);
+  padding: 10px;
 }
 
 /* Project Cards */
@@ -1598,3 +1602,14 @@ body {
 }
 .chatlog-who { color: var(--gold); font-weight: bold; }
 .chatlog-time { color: rgba(255,255,255,0.4); font-size: 8px; }
+
+/* Report cards in filing cabinet */
+#reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#reports-list .report-card {
+  width: 100%;
+  box-sizing: border-box;
+}
