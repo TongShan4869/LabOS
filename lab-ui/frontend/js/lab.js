@@ -722,14 +722,26 @@ hudReports?.addEventListener("click", toggleReportsList);
 
 // ── Report panel ──────────────────────────────────────────────────────────────
 
-function openReportPanel(agentId, text, ts) {
-  const agent = AGENTS[agentId];
+function openReportPanel(agentIdOrObj, text, ts) {
+  let agentId, reportText, reportTime;
+  if (typeof agentIdOrObj === 'object') {
+    // Called from filing cabinet with report object
+    agentId = agentIdOrObj.agent_id;
+    reportText = agentIdOrObj.text;
+    reportTime = agentIdOrObj.timestamp;
+  } else {
+    agentId = agentIdOrObj;
+    reportText = text;
+    reportTime = ts;
+  }
+  const agent = AGENTS[agentId] || { emoji: '❓', name: 'Unknown', role: 'Agent' };
   reportEmoji.textContent = agent.emoji;
   reportName.textContent = agent.name + " — " + agent.role;
-  reportTs.textContent = ts || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"});
-  reportBody.innerHTML = formatReport(text);
-  reportOverlay.classList.remove("hidden");
-  dlgOverlay.classList.add("shifted");
+  reportTs.textContent = reportTime || new Date().toLocaleTimeString("en", {hour:"2-digit", minute:"2-digit"});
+  reportBody.innerHTML = formatReport(reportText);
+  reportOverlay.classList.remove('hidden');
+  reportOverlay.style.display = 'flex';
+  closeFilingCabinet();
 }
 
 function closeReportPanel() {
