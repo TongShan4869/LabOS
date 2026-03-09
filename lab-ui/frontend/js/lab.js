@@ -842,26 +842,32 @@ document.addEventListener("keydown", (e) => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function init() {
+  // Hide lab until onboarding check completes
+  const labEl = document.getElementById("lab");
+  if (labEl) labEl.style.visibility = "hidden";
+  
   buildAgentSprites();
   connectSocket();
   updateClock();
   setInterval(updateClock, 10000);
 
-  // Initial status fetch
-  fetch("/api/status")
-    .then(r => r.json())
-    .then(data => updateHud(data))
-    .catch(() => {});
-
-  // Keyboard shortcut hints
-  showToast("🔬 LabOS ready! Click an agent to talk.");
+  // Check onboarding FIRST, then show lab
+  checkOnboardingNeeded(() => {
+    if (labEl) labEl.style.visibility = "visible";
+    // Initial status fetch
+    fetch("/api/status")
+      .then(r => r.json())
+      .then(data => updateHud(data))
+      .catch(() => {});
+    showToast("🔬 LabOS ready! Click an agent to talk.");
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);
 
 // ── Onboarding & Loading Logic ────────────────────────────────────────────
 
-function checkOnboardingNeeded() {
+function checkOnboardingNeeded(onReady) {
   // Check backend first — if config exists, skip onboarding regardless of localStorage
   fetch('/api/config')
     .then(r => r.json())
@@ -870,20 +876,24 @@ function checkOnboardingNeeded() {
         // Config exists — skip onboarding, update HUD
         localStorage.setItem('labos_onboarding_complete', 'true');
         $('hud-title').textContent = `${data.lab_name} — LabOS`;
+        if (onReady) onReady();
       } else {
         // No config on backend — always show onboarding
         localStorage.removeItem('labos_onboarding_complete');
-        showOnboarding();
+        showOnboarding(onReady);
       }
     })
     .catch(() => {
       if (!localStorage.getItem('labos_onboarding_complete')) {
-        showOnboarding();
+        showOnboarding(onReady);
+      } else {
+        if (onReady) onReady();
       }
     });
 }
 
-function showOnboarding() {
+function showOnboarding(onReady) {
+  window._onboardingReady = onReady;
   $('onboarding-overlay').classList.remove('hidden');
   $('onboard-step-1').classList.remove('hidden');
 }
@@ -928,6 +938,7 @@ function finishOnboarding() {
       // Hide onboarding, show loading screen
       setTimeout(() => {
         $('onboarding-overlay').classList.add('hidden');
+        if (window._onboardingReady) window._onboardingReady();
         showLoadingScreen(labName);
       }, 1000);
     } else {
@@ -1392,7 +1403,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.clear();
       sessionStorage.clear();
     }
-    checkOnboardingNeeded();
+    // checkOnboardingNeeded moved to init()
     $('hud-left')?.addEventListener('click', showXpModal);
     $('xp-modal-close')?.addEventListener('click', closeXpModal);
     $('xp-modal-overlay')?.addEventListener('click', (e) => {
