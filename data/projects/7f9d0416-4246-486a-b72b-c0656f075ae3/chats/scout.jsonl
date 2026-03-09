@@ -1,0 +1,3 @@
+{"role": "user", "text": "do a lit search of \"neural coupling in music\"", "ts": "14:47", "timestamp": "2026-03-09T14:47:48.576363"}
+{"role": "agent", "text": "Search for recent literature on \"neural coupling in music\" \u2014 looking for studies on inter-brain synchrony, neural entrainment, and speaker-listener coupling during musical experiences.\n\n\u23f3 Running skill...", "ts": "14:47", "timestamp": "2026-03-09T14:47:54.666725"}
+{"role": "agent", "text": "\u26a0\ufe0f Error (exit 1):\n```\n\u274c LAB_CONFIG.json not found. Run lab-init first.\n\n```", "ts": "14:47", "timestamp": "2026-03-09T14:47:56.972595"}
