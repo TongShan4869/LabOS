@@ -368,8 +368,10 @@ function openDialogue(agentId) {
   // Play greeting or last message
   const history = getLocalHistory(agentId);
   const lastAgentMsg = [...history].reverse().find(m => m.role === "agent");
-  const greetText = lastAgentMsg
-    ? `[${agent.name}]: ${lastAgentMsg.text}`
+  // Show greeting if no history, or if last message was garbage (heartbeat etc)
+  const isGarbage = lastAgentMsg && /^(HEARTBEAT_OK|NO_REPLY)$/i.test(lastAgentMsg.text.trim());
+  const greetText = (lastAgentMsg && !isGarbage)
+    ? lastAgentMsg.text
     : agent.greeting;
 
   typewrite(greetText, () => {
