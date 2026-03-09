@@ -630,7 +630,7 @@ _ensure_data_structure()
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", "labos-dev-secret")
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Active agent conversations: {agent_id: {"process": Popen, ...}}
 active_convos: dict = {}
