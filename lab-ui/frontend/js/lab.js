@@ -556,11 +556,22 @@ function updateAgentStatus(agentId, status, detail) {
   if (status === "working" || status === "researching" || status === "executing") {
     sprite.classList.add("working");
     setAgentAnimMode(agentId, "working");
-    bubble.textContent = detail ? detail.slice(0, 30) + (detail.length > 30 ? "…" : "") : "working…";
+    // Cute rotating status messages
+    const workPhrases = ["thinking hard", "crunching data", "reading papers", "brewing ideas", "on it!", "almost there"];
+    const phrase = detail || workPhrases[Math.floor(Math.random() * workPhrases.length)];
+    bubble.textContent = phrase.slice(0, 30) + (phrase.length > 30 ? "…" : "");
+    // Start cycling phrases
+    if (!sprite._phraseTimer) {
+      sprite._phraseTimer = setInterval(() => {
+        if (!sprite.classList.contains("working")) return;
+        bubble.textContent = workPhrases[Math.floor(Math.random() * workPhrases.length)];
+      }, 3000);
+    }
   } else {
     sprite.classList.remove("working");
     setAgentAnimMode(agentId, "idle");
     bubble.textContent = "";
+    if (sprite._phraseTimer) { clearInterval(sprite._phraseTimer); sprite._phraseTimer = null; }
   }
 }
 
