@@ -870,7 +870,9 @@ function checkOnboardingNeeded() {
         // Config exists — skip onboarding, update HUD
         localStorage.setItem('labos_onboarding_complete', 'true');
         $('hud-title').textContent = `${data.lab_name} — LabOS`;
-      } else if (!localStorage.getItem('labos_onboarding_complete')) {
+      } else {
+        // No config on backend — always show onboarding
+        localStorage.removeItem('labos_onboarding_complete');
         showOnboarding();
       }
     })
