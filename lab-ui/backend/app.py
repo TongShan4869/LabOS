@@ -441,10 +441,8 @@ def _ensure_data_structure():
         if project_dirs:
             _set_active_project(project_dirs[0].name)
         else:
-            # Create default project
-            default_id = str(uuid.uuid4())
-            _create_project_structure(default_id, "Default Project", "Research", datetime.now().isoformat())
-            _set_active_project(default_id)
+            # No projects yet — onboarding will create one
+            pass
 
 
 def _create_project_structure(project_id: str, name: str, field: str, created: str, description: str = ""):
