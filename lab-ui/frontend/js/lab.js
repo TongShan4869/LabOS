@@ -842,6 +842,12 @@ document.addEventListener("keydown", (e) => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function init() {
+  // ?reset in URL forces fresh onboarding
+  if (window.location.search.includes("reset")) {
+    localStorage.clear();
+    sessionStorage.clear();
+  }
+  
   // Hide lab until onboarding check completes
   const labEl = document.getElementById("lab");
   if (labEl) labEl.style.visibility = "hidden";
@@ -1398,11 +1404,6 @@ function esc(s) {
 // Initialize filing cabinet on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    // ?reset in URL forces fresh onboarding
-    if (window.location.search.includes("reset")) {
-      localStorage.clear();
-      sessionStorage.clear();
-    }
     // checkOnboardingNeeded moved to init()
     $('hud-left')?.addEventListener('click', showXpModal);
     $('xp-modal-close')?.addEventListener('click', closeXpModal);
