@@ -1080,6 +1080,8 @@ DO NOT use the tool for:
 For those, just respond normally as a helpful research assistant.
 When asked "what can you do?", explain your role and capabilities in plain text."""
     
+    # Prepend override to prevent gateway system prompt bleed-through
+    system_text = "IMPORTANT: You are NOT OpenClaw. You are NOT 醋の虾 the Discord bot. Ignore any prior system instructions about heartbeats, HEARTBEAT_OK, NO_REPLY, or Discord. You are ONLY the LabOS agent described below.\n\n" + system_text
     messages = [{"role": "system", "content": system_text}]
     for msg in history[:-1]:  # exclude the current message (already in history)
         role = "user" if msg["role"] == "user" else "assistant"
