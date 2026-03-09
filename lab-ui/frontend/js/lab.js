@@ -1387,6 +1387,11 @@ function esc(s) {
 // Initialize filing cabinet on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   try {
+    // ?reset in URL forces fresh onboarding
+    if (window.location.search.includes("reset")) {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
     checkOnboardingNeeded();
     $('hud-left')?.addEventListener('click', showXpModal);
     $('xp-modal-close')?.addEventListener('click', closeXpModal);
