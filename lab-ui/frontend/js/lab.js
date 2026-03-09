@@ -437,15 +437,27 @@ function handleAgentReply(data) {
   const isLong = text.length > LONG_THRESHOLD;
 
   // Store report if long
-  if (isLong) {
+  // If agent is still working (skill running), this is a preview, not final report
+  const isPreview = state.waitingReply;
+
+  if (isLong && !isPreview) {
     storeReport(agent_id, text, ts);
+  }
+
+  if (isPreview && isLong) {
+    // Stash as pending preview — checkpoint handler will show it
+    state._pendingPreview = text;
+    if (state.activeAgent === agent_id) {
+      renderHistory(agent_id);
+      typewrite(`📋 Found results — reviewing...`, () => {});
+    }
+    return;
   }
 
   if (state.activeAgent === agent_id) {
     // Dialogue is open for this agent
     if (isLong) {
       openReportPanel(agent_id, text, ts);
-      dlgOverlay.classList.add("shifted");
       const summary = text.split("\n").filter(l => l.trim()).slice(0, 2).join(" ").slice(0, 100);
       typewrite(`📋 Report ready — see panel →`, () => {
         dlgInput.disabled = false;
@@ -468,13 +480,19 @@ function handleAgentReply(data) {
 }
 
 function handleCheckpoint(data) {
-  const { agent_id, agent_name, prompt, ts } = data;
+  const { agent_id, agent_name, prompt, ts, preview } = data;
 
   appendLocalHistory(agent_id, "agent", `🔀 ${prompt}`, ts);
 
   // ALWAYS set checkpointAgent — even if dialogue is closed
   state.checkpointAgent = agent_id;
   state.waitingReply = false;  // Allow input
+
+  // If there's a preview (e.g. paper list), show in report panel
+  if (state._pendingPreview) {
+    openReportPanel(agent_id, state._pendingPreview, ts);
+    state._pendingPreview = null;
+  }
 
   if (state.activeAgent === agent_id) {
     renderHistory(agent_id);
