@@ -1419,6 +1419,10 @@ def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, si
 
             if line.startswith("[CHECKPOINT]"):
                 prompt_text = line[len("[CHECKPOINT]"):].strip()
+                # Strip options line like "[all] / [1] / [2] ... (default: all)"
+                _lines = prompt_text.split("\n")
+                _lines = [l for l in _lines if not (l.strip().startswith("[") and "/" in l)]
+                prompt_text = "\n".join(_lines).strip()
 
                 if output_lines:
                     _emit_agent_reply(agent_id, agent, "\n".join(output_lines), sid)
