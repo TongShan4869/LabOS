@@ -848,9 +848,11 @@ function init() {
     sessionStorage.clear();
   }
   
-  // Hide lab until onboarding check completes
-  const labEl = document.getElementById("lab");
-  if (labEl) labEl.style.visibility = "hidden";
+  // Hide lab + HUD until onboarding check completes
+  const labEl = document.getElementById("lab-scene");
+  const hudEl = document.getElementById("hud");
+  if (labEl) labEl.style.display = "none";
+  if (hudEl) hudEl.style.display = "none";
   
   buildAgentSprites();
   connectSocket();
@@ -859,7 +861,8 @@ function init() {
 
   // Check onboarding FIRST, then show lab
   checkOnboardingNeeded(() => {
-    if (labEl) labEl.style.visibility = "visible";
+    if (labEl) labEl.style.display = "";
+    if (hudEl) hudEl.style.display = "";
     // Initial status fetch
     fetch("/api/status")
       .then(r => r.json())
