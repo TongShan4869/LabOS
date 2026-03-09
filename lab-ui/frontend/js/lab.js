@@ -607,7 +607,7 @@ function showToast(msg) {
 
 function connectSocket() {
   const origin = window.location.origin;
-  const socket = io(origin, { transports: ["websocket", "polling"] });
+  const socket = io(origin, { transports: ["polling", "websocket"] });
   state.socket = socket;
 
   socket.on("connect", () => {
