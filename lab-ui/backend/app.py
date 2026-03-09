@@ -1464,6 +1464,13 @@ def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, si
                 _emit_agent_reply(agent_id, agent, msg, sid)
 
             elif line.strip():
+                # Skip checkpoint option lines like "   [all] / [1] / [2] ... (default: all)"
+                stripped = line.strip()
+                if stripped.startswith("[") and "] / [" in stripped:
+                    continue
+                # Skip arrow prompt lines
+                if stripped == "→":
+                    continue
                 output_lines.append(line)
 
         proc.wait(timeout=120)
