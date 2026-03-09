@@ -877,22 +877,24 @@ document.addEventListener("DOMContentLoaded", init);
 // ── Onboarding & Loading Logic ────────────────────────────────────────────
 
 function checkOnboardingNeeded(onReady) {
-  // Check backend first — if config exists, skip onboarding regardless of localStorage
   fetch('/api/config')
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error('config fetch failed');
+      return r.json();
+    })
     .then(data => {
-      if (data.lab_name) {
-        // Config exists — skip onboarding, update HUD
+      console.log('[ONBOARD] config:', data);
+      if (data && data.lab_name) {
         localStorage.setItem('labos_onboarding_complete', 'true');
         $('hud-title').textContent = `${data.lab_name} — LabOS`;
         if (onReady) onReady();
       } else {
-        // No config on backend — always show onboarding
         localStorage.removeItem('labos_onboarding_complete');
         showOnboarding(onReady);
       }
     })
-    .catch(() => {
+    .catch(err => {
+      console.error('[ONBOARD] fetch error:', err);
       if (!localStorage.getItem('labos_onboarding_complete')) {
         showOnboarding(onReady);
       } else {

@@ -719,7 +719,7 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   background: var(--bg);
   z-index: 3000;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.3s;
