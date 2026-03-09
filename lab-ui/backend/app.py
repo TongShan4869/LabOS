@@ -215,23 +215,22 @@ If the user needs specialized help, suggest the right agent (Scout for literatur
 
     "scout": """You are Scout, the Literature Search specialist in LabOS.
 
-CAPABILITIES:
-- Run literature searches across PubMed, OpenAlex, and arXiv
-- Summarize papers and assess relevance
-- Track search history and learned preferences
+You have access to a real search tool that queries PubMed, OpenAlex, and arXiv.
+You CANNOT search papers yourself. You MUST use the tool. NEVER list papers from your own knowledge.
 
-TOOL: To run a NEW literature search, output exactly:
+MANDATORY: When the user asks to find/search/look for papers, you MUST output this EXACT format (no exceptions):
 [TOOL_CALL]{"tool": "search", "args": {"query": "search terms", "limit": 10}}[/TOOL_CALL]
 
-Available args: query (required), limit (1-20), since (YYYY-MM-DD), sort (relevance|citations|date), project
+The system will execute the search and return real results. Do NOT make up papers.
 
-IMPORTANT RULES:
-- Only search when the user wants NEW papers
-- If they ask "where is the paper?" or "what did we find?", reference conversation history — don't search again
-- If they say "summarize top 5" after a search, work with existing results — do NOT search again
-- When you do search, explain what you're doing briefly
-- Be concise but thorough — you're a researcher, not a search engine
-- Always reference previous context when relevant""",
+Available args: query (required), limit (1-20, default 10), since (YYYY-MM-DD), sort (relevance|citations|date)
+
+RULES:
+- ANY request involving finding/searching papers → use [TOOL_CALL]. No exceptions.
+- If they ask about PREVIOUS results already shown in conversation → reference history, don't search again
+- If they say "summarize top 5" after a search → work with existing results
+- Keep your pre-search message brief: "Searching for X..." then the [TOOL_CALL] on the next line
+- Be a researcher, not a search engine""",
 
     "stat": """You are Stat, the Biostatistician in LabOS.
 
@@ -630,7 +629,7 @@ _ensure_data_structure()
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", "labos-dev-secret")
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # Active agent conversations: {agent_id: {"process": Popen, ...}}
 active_convos: dict = {}
@@ -992,6 +991,7 @@ def api_init():
 
 @socketio.on("connect")
 def on_connect():
+    start_broadcast()
     emit("lab_status", get_lab_status())
 
 
@@ -1086,8 +1086,38 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         messages.append({"role": role, "content": msg["text"]})
     messages.append({"role": "user", "content": text})
     
+    # For scout: if user clearly wants a search, skip LLM and go straight to skill
+        # For scout: if user clearly wants a search, skip LLM and go straight to skill
+    if agent_id == "scout" and skill:
+        import re as _re
+        search_patterns = _re.compile(r"(search|find|look for|look up|get|fetch|discover)\\b.*(paper|article|literature|publication|study|studies)", _re.I)
+        if search_patterns.search(text):
+            msg = "Searching for papers... \U0001f50d\n\n\u23f3 Running skill..."
+            _emit_agent_reply(agent_id, agent, msg, sid)
+            _run_skill_interactive(agent_id, agent, skill, text, sid)
+            return
+    
+    # For scout: if user clearly wants a search, skip LLM and go straight to skill
+    if agent_id == "scout" and skill:
+        import re as _re
+        _search_pat = _re.compile(r"(search|find|look for|look up|get|fetch|discover)\b.*(paper|article|literature|publication|study|studies)", _re.I)
+        if _search_pat.search(text):
+            _emit_agent_reply(agent_id, agent, "Searching for papers...\n\n" + chr(9203) + " Running skill...", sid)
+            _run_skill_interactive(agent_id, agent, skill, text, sid)
+            return
+
+    # For scout: if user clearly wants a search, skip LLM and go straight to skill
+    if agent_id == "scout" and skill:
+        import re as _re
+        _search_pat = _re.compile(r"(search|find|look for|look up|get|fetch|discover)\b.*(paper|article|literature|publication|study|studies)", _re.I)
+        if _search_pat.search(text):
+            _emit_agent_reply(agent_id, agent, "Searching for papers...\n\n" + chr(9203) + " Running skill...", sid)
+            _run_skill_interactive(agent_id, agent, skill, text, sid)
+            return
+
     # Call LLM
     response = _run_llm(messages)
+    print(f"[LLM_FULL] {repr(response[:500])}", flush=True)
     
     # Check if agent wants to run a skill
     has_tool_call = "[RUN_SKILL]" in response or "[TOOL_CALL]" in response
@@ -1700,12 +1730,19 @@ def _broadcast_status():
         socketio.emit("lab_status", get_lab_status())
 
 
-broadcast_thread = threading.Thread(target=_broadcast_status, daemon=True)
-broadcast_thread.start()
+_broadcast_started = False
+def start_broadcast():
+    global _broadcast_started
+    if _broadcast_started:
+        return
+    _broadcast_started = True
+    broadcast_thread = threading.Thread(target=_broadcast_status, daemon=True)
+    broadcast_thread.start()
 
 # ─── Entry ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.environ.get("LABOS_UI_PORT", 18792))
     print(f"🔬 LabOS UI running at http://127.0.0.1:{port}")
+    start_broadcast()
     socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)
