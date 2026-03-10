@@ -670,13 +670,12 @@ function connectSocket() {
     const handlers = {
       "quest.created": () => {
         updateCoins();
-        // If quest board is open, refresh it
-        const questPanel = document.getElementById("quest-panel");
-        if (questPanel && !questPanel.classList.contains("hidden")) {
-          const activeTab = document.querySelector(".quest-tab.active");
-          if (activeTab) activeTab.click();
+        // If dashboard is open on quests tab, refresh
+        const panel = document.getElementById("dashboard-panel");
+        if (panel && !panel.classList.contains("hidden")) {
+          const activeTab = document.querySelector(".dash-tab.active");
+          if (activeTab?.dataset.tab === "quests") dashLoadTab("quests");
         }
-        // Show toast
         const p = event.payload;
         if (p.agent_id && p.title) {
           showToast(`📋 New quest: ${p.title} → ${p.agent_id}`);
@@ -684,10 +683,10 @@ function connectSocket() {
       },
       "quest.completed": () => {
         updateCoins();
-        const questPanel = document.getElementById("quest-panel");
-        if (questPanel && !questPanel.classList.contains("hidden")) {
-          const activeTab = document.querySelector(".quest-tab.active");
-          if (activeTab) activeTab.click();
+        const panel = document.getElementById("dashboard-panel");
+        if (panel && !panel.classList.contains("hidden")) {
+          const activeTab = document.querySelector(".dash-tab.active");
+          if (activeTab?.dataset.tab === "quests") dashLoadTab("quests");
         }
         showToast("✅ Quest completed!");
       },
@@ -839,7 +838,6 @@ function openReportPanel(agentIdOrObj, text, ts) {
   reportBody.innerHTML = formatReport(reportText);
   reportOverlay.classList.remove('hidden');
   reportOverlay.style.display = 'flex';
-  closeFilingCabinet();
 }
 
 function closeReportPanel() {
@@ -1171,72 +1169,28 @@ function addToChatLog(who, text) {
 
 
 
+// Filing cabinet replaced by unified dashboard
 function initFilingCabinet() {
+  // Legacy — filing cabinet is now part of the dashboard panel
   const el = (id) => document.getElementById(id);
-  
-  el('hud-filing')?.addEventListener('click', showFilingCabinet);
-  el('filing-close')?.addEventListener('click', closeFilingCabinet);
-  el('filing-overlay')?.addEventListener('click', (e) => {
-    if (e.target.id === 'filing-overlay') closeFilingCabinet();
-  });
-
-  document.querySelectorAll('.filing-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchFilingTab(btn.dataset.tab));
-  });
-
-  el('new-project-btn')?.addEventListener('click', showNewProjectModal);
   el('new-project-cancel')?.addEventListener('click', closeNewProjectModal);
   el('new-project-confirm')?.addEventListener('click', createNewProject);
-
-  document.querySelectorAll('.add-memory-btn').forEach(btn => {
-    btn.addEventListener('click', () => showAddMemoryModal(btn.dataset.type));
-  });
   el('memory-note-cancel')?.addEventListener('click', closeAddMemoryModal);
   el('memory-note-confirm')?.addEventListener('click', saveMemoryNote);
-
-  el('memory-agent-select')?.addEventListener('change', (e) => {
-    loadAgentMemory(e.target.value);
-  });
 }
 
 function showFilingCabinet() {
-  const overlay = document.getElementById('filing-overlay');
-  overlay.classList.remove('hidden');
-  overlay.style.display = 'flex';
-  filingState.open = true;
-  // Always fetch active project first
-  fetch('/api/projects')
-    .then(r => r.json())
-    .then(data => {
-      filingState.activeProjectId = data.active_project_id;
-      // Load whichever tab is active
-      const activeTab = document.querySelector('.filing-tab.active');
-      const tabName = activeTab ? activeTab.dataset.tab : 'projects';
-      switchFilingTab(tabName);
-    })
-    .catch(() => loadProjects());
+  // Redirect to dashboard projects tab
+  const panel = document.getElementById("dashboard-panel");
+  const btn = document.getElementById("hud-dashboard");
+  if (panel) { panel.classList.remove("hidden"); btn?.classList.add("active"); }
+  document.querySelectorAll(".dash-tab").forEach(t => t.classList.remove("active"));
+  const projTab = document.querySelector('.dash-tab[data-tab="projects"]');
+  if (projTab) projTab.classList.add("active");
+  dashLoadTab("projects");
 }
 
-function closeFilingCabinet() {
-  const overlay = document.getElementById('filing-overlay');
-  if (overlay) { overlay.classList.add('hidden'); overlay.style.display = 'none'; filingState.open = false; }
-}
-
-function switchFilingTab(tabName) {
-  document.querySelectorAll('.filing-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.filing-tab-content').forEach(c => {
-    c.classList.remove('active');
-    c.style.display = 'none';
-  });
-  const tab = document.querySelector(`.filing-tab[data-tab="${tabName}"]`);
-  const content = document.getElementById(`filing-tab-${tabName}`);
-  if (tab) tab.classList.add('active');
-  if (content) { content.classList.add('active'); content.style.display = 'block'; }
-
-  if (tabName === 'projects') loadProjects();
-  else if (tabName === 'reports') loadReports();
-  else if (tabName === 'memory') loadMemory();
-}
+function closeFilingCabinet() { /* no-op — dashboard handles this */ }
 
 function loadProjects() {
   fetch('/api/projects')
@@ -1493,96 +1447,230 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch(e) { console.error('[INIT] Error:', e); }
 });
 
-// ── Quest Board ──────────────────────────────
+// ── Unified Dashboard (below lab scene) ──────
 
-document.getElementById("hud-quests")?.addEventListener("click", () => {
-  const overlay = document.getElementById("quest-overlay");
-  overlay.classList.toggle("hidden");
-  if (!overlay.classList.contains("hidden")) {
-    loadQuests("active");
+document.getElementById("hud-dashboard")?.addEventListener("click", () => {
+  const panel = document.getElementById("dashboard-panel");
+  const btn = document.getElementById("hud-dashboard");
+  if (panel.classList.contains("hidden")) {
+    panel.classList.remove("hidden");
+    btn.classList.add("active");
+    // Load default tab
+    dashLoadTab("quests");
+  } else {
+    panel.classList.add("hidden");
+    btn.classList.remove("active");
   }
 });
 
-document.getElementById("quest-close")?.addEventListener("click", () => {
-  document.getElementById("quest-overlay").classList.add("hidden");
-});
-
-// Tab switching
-document.querySelectorAll(".quest-tab").forEach(tab => {
+document.querySelectorAll(".dash-tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".quest-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".dash-tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
-    const tabName = tab.dataset.tab;
-    if (tabName === "roster") {
-      loadRoster();
-    } else {
-      loadQuests(tabName);
-    }
+    dashLoadTab(tab.dataset.tab);
   });
 });
 
-async function loadQuests(filter) {
-  const content = document.getElementById("quest-content");
-  content.innerHTML = '<div class="quest-loading">Loading...</div>';
-  
+async function dashLoadTab(tabName) {
+  const content = document.getElementById("dashboard-content");
+  content.innerHTML = '<div class="dash-loading">Loading...</div>';
+
   try {
-    const res = await fetch(origin + "/api/quests?all=true");
-    const quests = await res.json();
-    
-    const filtered = filter === "active" 
-      ? quests.filter(q => q.status === "active")
-      : quests.filter(q => q.status === "done");
-    
-    if (filtered.length === 0) {
-      content.innerHTML = `<div class="quest-loading">${filter === "active" ? "No active quests. Talk to the Lab Manager!" : "No completed quests yet."}</div>`;
-      return;
+    switch (tabName) {
+      case "quests": return await dashLoadQuests(content);
+      case "roster": return await dashLoadRoster(content);
+      case "projects": return await dashLoadProjects(content);
+      case "reports": return await dashLoadReports(content);
+      case "memory": return await dashLoadMemory(content);
+      case "schedules": return await dashLoadSchedules(content);
     }
-    
-    content.innerHTML = filtered.map(q => `
-      <div class="quest-card ${q.status}">
-        <div class="quest-title">${q.title}</div>
-        <div class="quest-meta">
-          <span class="quest-agent">🤖 ${q.assigned_to}</span>
-          <span class="quest-xp">✨ ${q.xp_reward} XP</span>
-          <span>${q.status === "done" ? "Completed " + new Date(q.completed_at).toLocaleDateString() : "Started " + new Date(q.created_at).toLocaleDateString()}</span>
-        </div>
-        ${q.result_summary ? `<div style="font-size:12px;color:#aaa;margin-top:6px">${q.result_summary}</div>` : ""}
-      </div>
-    `).join("");
   } catch (e) {
-    content.innerHTML = '<div class="quest-loading">Failed to load quests.</div>';
+    content.innerHTML = `<div class="dash-loading">Failed to load ${tabName}.</div>`;
+    console.error("Dashboard error:", e);
   }
 }
 
-async function loadRoster() {
-  const content = document.getElementById("quest-content");
-  content.innerHTML = '<div class="quest-loading">Loading team...</div>';
+async function dashLoadQuests(content) {
+  const res = await fetch(origin + "/api/quests?all=true");
+  const quests = await res.json();
+  const active = quests.filter(q => q.status === "active");
+  const done = quests.filter(q => q.status === "done");
+
+  if (quests.length === 0) {
+    content.innerHTML = '<div class="dash-loading">No quests yet. Talk to the Lab Manager to get started!</div>';
+    return;
+  }
+
+  let html = "";
+  if (active.length > 0) {
+    html += '<h3 style="color:#8888ff;margin:0 0 8px">⚡ Active</h3>';
+    html += active.map(q => renderQuestCard(q)).join("");
+  }
+  if (done.length > 0) {
+    html += '<h3 style="color:#6a6;margin:12px 0 8px">✅ Completed</h3>';
+    html += done.map(q => renderQuestCard(q)).join("");
+  }
+  content.innerHTML = html;
+}
+
+function renderQuestCard(q) {
+  return `
+    <div class="quest-card ${q.status}">
+      <div class="quest-title">${q.title}</div>
+      <div class="quest-meta">
+        <span class="quest-agent">🤖 ${q.assigned_to}</span>
+        <span class="quest-xp">✨ ${q.xp_reward} XP</span>
+        <span>${q.status === "done" ? "✅ " + new Date(q.completed_at).toLocaleDateString() : "⏳ " + new Date(q.created_at).toLocaleDateString()}</span>
+      </div>
+      ${q.result_summary ? `<div style="font-size:12px;color:#aaa;margin-top:6px">${q.result_summary}</div>` : ""}
+    </div>`;
+}
+
+async function dashLoadRoster(content) {
+  const res = await fetch(origin + "/api/agents/roster");
+  const roster = await res.json();
+
+  content.innerHTML = roster.map(a => `
+    <div class="roster-card">
+      <img class="roster-avatar" src="${origin}/assets/avatars/avatar-${a.id}.png" onerror="this.style.display='none'">
+      <div class="roster-info">
+        <div class="roster-name">${a.name}</div>
+        <div class="roster-specialty">${a.specialty}</div>
+        <div class="roster-stats">
+          🏃 ${a.usage.runs} runs · 
+          🪙 $${a.usage.cost_usd.toFixed(2)} ·
+          ${a.usage.last_active ? "Last: " + new Date(a.usage.last_active).toLocaleDateString() : "Never used"}
+        </div>
+      </div>
+      <span class="roster-lifecycle ${a.lifecycle}">${a.lifecycle}</span>
+    </div>
+  `).join("");
+}
+
+async function dashLoadProjects(content) {
+  const res = await fetch(origin + "/api/projects");
+  const data = await res.json();
+  const projects = data.projects || [];
+  const activeId = data.active_project_id;
+
+  let html = projects.map(p => `
+    <div class="quest-card ${p.id === activeId ? '' : 'done'}" style="cursor:pointer" onclick="switchProject('${p.id}')">
+      <div class="quest-title">${p.id === activeId ? '🟢 ' : ''}${p.name || 'Untitled Project'}</div>
+      <div class="quest-meta">
+        <span>${(p.fields || []).join(', ') || 'No fields set'}</span>
+        <span>Created ${new Date(p.created_at).toLocaleDateString()}</span>
+      </div>
+    </div>
+  `).join("");
+  html += '<button class="filing-action-btn" onclick="showNewProjectModal()" style="margin-top:8px;width:100%;padding:8px;background:#2a4a6a;color:#fff;border:1px solid #3a6a9a;border-radius:6px;cursor:pointer">+ New Project</button>';
+  content.innerHTML = html;
+}
+
+async function dashLoadReports(content) {
+  const res = await fetch(origin + "/api/reports");
+  const reports = await res.json();
+
+  if (!reports.length) {
+    content.innerHTML = '<div class="dash-loading">No reports yet. Run a literature search to generate one!</div>';
+    return;
+  }
+
+  content.innerHTML = reports.map(r => `
+    <div class="quest-card" style="cursor:pointer" onclick="openReportById('${r.filename}')">
+      <div class="quest-title">📄 ${r.title || r.filename}</div>
+      <div class="quest-meta">
+        <span>🤖 ${r.agent_id || 'unknown'}</span>
+        <span>${new Date(r.timestamp).toLocaleDateString()}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function dashLoadMemory(content) {
+  const agents = ["main", "scout", "stat", "quill", "sage", "critic", "trend", "warden"];
+  
+  let html = '<div style="margin-bottom:12px"><label style="color:#aaa;font-size:12px">Agent: </label>';
+  html += `<select id="dash-memory-agent" onchange="dashRefreshMemory()" style="background:#1e1e3a;color:#fff;border:1px solid #3a3a5c;padding:4px 8px;border-radius:4px">`;
+  html += agents.map(a => `<option value="${a}">${a}</option>`).join("");
+  html += '</select></div>';
+  html += '<div id="dash-memory-content"></div>';
+  content.innerHTML = html;
+  dashRefreshMemory();
+}
+
+async function dashRefreshMemory() {
+  const agent = document.getElementById("dash-memory-agent")?.value || "main";
+  const el = document.getElementById("dash-memory-content");
+  if (!el) return;
   
   try {
-    const res = await fetch(origin + "/api/agents/roster");
-    const roster = await res.json();
-    
-    content.innerHTML = roster.map(a => `
-      <div class="roster-card">
-        <img class="roster-avatar" src="${origin}/assets/avatars/avatar-${a.id}.png" onerror="this.style.display='none'">
-        <div class="roster-info">
-          <div class="roster-name">${a.name}</div>
-          <div class="roster-specialty">${a.specialty}</div>
-          <div class="roster-stats">
-            🏃 ${a.usage.runs} runs · 
-            🪙 ${a.usage.cost_usd.toFixed(2)} USD ·
-            ${a.usage.last_active ? "Last active: " + new Date(a.usage.last_active).toLocaleDateString() : "Never used"}
-          </div>
-        </div>
-        <span class="roster-lifecycle ${a.lifecycle}">${a.lifecycle}</span>
-      </div>
-    `).join("");
-  } catch (e) {
-    content.innerHTML = '<div class="quest-loading">Failed to load roster.</div>';
+    const res = await fetch(origin + `/api/agent-memory/${agent}`);
+    const data = await res.json();
+    const memory = data.memory || "No memory recorded yet.";
+    el.innerHTML = `<div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px;font-size:13px;color:#ccc;white-space:pre-wrap;max-height:300px;overflow-y:auto">${memory}</div>`;
+  } catch {
+    el.innerHTML = '<div class="dash-loading">Could not load memory.</div>';
   }
 }
 
-// ── Coins Counter (lab cost tracking) ────────────────────────────────────────
+async function dashLoadSchedules(content) {
+  const res = await fetch(origin + "/api/schedules");
+  const schedules = await res.json();
+
+  if (!schedules.length) {
+    content.innerHTML = `
+      <div class="dash-loading">
+        <p>🌙 No scheduled tasks yet.</p>
+        <p style="font-size:12px;color:#888">Tell the Lab Manager to schedule recurring work, like:<br>
+        "Check for new papers in my field every Monday"</p>
+      </div>`;
+    return;
+  }
+
+  content.innerHTML = schedules.map(s => `
+    <div class="quest-card ${s.enabled ? '' : 'done'}">
+      <div class="quest-title">🌙 ${s.description || s.task}</div>
+      <div class="quest-meta">
+        <span class="quest-agent">🤖 ${s.agent_id}</span>
+        <span>⏰ ${s.cron_expr}</span>
+        <span>${s.run_count} runs</span>
+      </div>
+      ${s.last_run ? `<div style="font-size:11px;color:#666;margin-top:4px">Last run: ${new Date(s.last_run).toLocaleString()}</div>` : ''}
+    </div>
+  `).join("");
+}
+
+// Helper for opening reports from dashboard
+function openReportById(filename) {
+  // Reuse existing report panel logic
+  fetch(origin + `/api/report/${filename}`)
+    .then(r => r.json())
+    .then(report => {
+      if (report.text) {
+        const rp = document.getElementById("report-panel");
+        const rb = document.getElementById("report-body");
+        if (rp && rb) {
+          rb.innerHTML = marked.parse(report.text);
+          rp.classList.remove("hidden");
+        }
+      }
+    })
+    .catch(() => showToast("⚠️ Could not load report"));
+}
+
+// Helper for switching projects from dashboard
+function switchProject(projectId) {
+  fetch(origin + "/api/projects/switch", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({project_id: projectId})
+  }).then(() => {
+    showToast("🔬 Switched project!");
+    dashLoadTab("projects");
+  }).catch(() => showToast("⚠️ Failed to switch project"));
+}
+
+// ── Coins Counter ────────────────────────────
 
 async function updateCoins() {
   try {
@@ -1598,56 +1686,5 @@ async function updateCoins() {
   } catch(e) {}
 }
 
-// Update coins every 30s and on page load
 updateCoins();
 setInterval(updateCoins, 30000);
-
-// ── Night Shift (Schedules) ──────────────────────────────────────────────────
-
-async function loadSchedules() {
-  const content = document.getElementById("quest-content");
-  content.innerHTML = '<div class="quest-loading">Loading schedules...</div>';
-  
-  try {
-    const res = await fetch(origin + "/api/schedules");
-    const schedules = await res.json();
-    
-    if (schedules.length === 0) {
-      content.innerHTML = `
-        <div class="quest-loading">
-          <p>🌙 No scheduled tasks yet.</p>
-          <p style="font-size:12px;color:#888">Tell the Lab Manager to schedule recurring work, like:<br>
-          "Check for new papers in my field every Monday"</p>
-        </div>`;
-      return;
-    }
-    
-    content.innerHTML = schedules.map(s => `
-      <div class="quest-card ${s.enabled ? '' : 'done'}">
-        <div class="quest-title">🌙 ${s.description || s.task}</div>
-        <div class="quest-meta">
-          <span class="quest-agent">🤖 ${s.agent_id}</span>
-          <span>⏰ ${s.cron_expr}</span>
-          <span>${s.run_count} runs</span>
-        </div>
-        ${s.last_run ? `<div style="font-size:11px;color:#666;margin-top:4px">Last run: ${new Date(s.last_run).toLocaleString()}</div>` : ''}
-      </div>
-    `).join("");
-  } catch (e) {
-    content.innerHTML = '<div class="quest-loading">Failed to load schedules.</div>';
-  }
-}
-
-// Update quest tab handler to include schedules
-document.querySelectorAll(".quest-tab").forEach(tab => {
-  tab.removeEventListener("click", tab._handler);
-  tab._handler = () => {
-    document.querySelectorAll(".quest-tab").forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    const tabName = tab.dataset.tab;
-    if (tabName === "roster") loadRoster();
-    else if (tabName === "schedules") loadSchedules();
-    else loadQuests(tabName);
-  };
-  tab.addEventListener("click", tab._handler);
-});

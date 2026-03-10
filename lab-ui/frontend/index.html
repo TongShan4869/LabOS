@@ -22,8 +22,7 @@
       <span id="hud-title">LabOS</span>
     </div>
     <div id="hud-right">
-      <button id="hud-quests" class="hud-btn" title="Quest Board">📋</button>
-      <button id="hud-filing" class="hud-btn" title="Filing Cabinet">📂</button>
+      <button id="hud-dashboard" class="hud-btn" title="Dashboard">📊</button>
         <button id="hud-chatlog" class="hud-btn" title="Chat Log">📜</button>
         <button id="hud-daynight" class="hud-btn" title="Toggle Day/Night">🌙</button>
       <span id="hud-time">--:--</span>
@@ -97,63 +96,18 @@
     </div>
   </div>
 
-  <!-- ── Filing Cabinet Panel ──────────────────── -->
-  <div id="filing-overlay" class="hidden">
-    <div id="filing-panel">
-      <div id="filing-header">
-        <h2>📂 Lab Filing Cabinet</h2>
-        <button id="filing-close">✕ Close</button>
-      </div>
-      
-      <div id="filing-tabs">
-        <button class="filing-tab active" data-tab="projects">Projects</button>
-        <button class="filing-tab" data-tab="reports">Reports</button>
-        <button class="filing-tab" data-tab="memory">Memory</button>
-      </div>
-      
-      <div id="filing-content">
-        <!-- Projects Tab -->
-        <div class="filing-tab-content active" id="filing-tab-projects">
-          <div id="projects-list"></div>
-          <button id="new-project-btn" class="filing-action-btn">+ New Project</button>
-        </div>
-        
-        <!-- Reports Tab -->
-        <div class="filing-tab-content" id="filing-tab-reports">
-          <div id="reports-list"></div>
-        </div>
-        
-        <!-- Memory Tab -->
-        <div class="filing-tab-content" id="filing-tab-memory">
-          <div class="memory-section">
-            <h3>Agent Memory</h3>
-            <select id="memory-agent-select">
-              <option value="main">醋の虾</option>
-              <option value="scout">Scout</option>
-              <option value="stat">Stat</option>
-              <option value="quill">Quill</option>
-              <option value="sage">Sage</option>
-              <option value="critic">Critic</option>
-              <option value="trend">Trend</option>
-              <option value="warden">Warden</option>
-            </select>
-            <div id="agent-memory-list" class="memory-list"></div>
-            <button class="add-memory-btn" data-type="agent">+ Add Note</button>
-          </div>
-          
-          <div class="memory-section">
-            <h3>Project Memory</h3>
-            <div id="project-memory-list" class="memory-list"></div>
-            <button class="add-memory-btn" data-type="project">+ Add Note</button>
-          </div>
-          
-          <div class="memory-section">
-            <h3>Lab Memory</h3>
-            <div id="lab-memory-list" class="memory-list"></div>
-            <button class="add-memory-btn" data-type="lab">+ Add Note</button>
-          </div>
-        </div>
-      </div>
+  <!-- ── Dashboard Panel (below lab scene) ──────── -->
+  <div id="dashboard-panel" class="hidden">
+    <div id="dashboard-tabs">
+      <button class="dash-tab active" data-tab="quests">📋 Quests</button>
+      <button class="dash-tab" data-tab="roster">🤖 Team</button>
+      <button class="dash-tab" data-tab="projects">📁 Projects</button>
+      <button class="dash-tab" data-tab="reports">📄 Reports</button>
+      <button class="dash-tab" data-tab="memory">🧠 Memory</button>
+      <button class="dash-tab" data-tab="schedules">🌙 Night Shift</button>
+    </div>
+    <div id="dashboard-content">
+      <div class="dash-loading">Select a tab...</div>
     </div>
   </div>
 
@@ -311,25 +265,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="js/lab.js?v=20260310a"></script>
+  <script src="js/lab.js?v=20260311a"></script>
 
-  <!-- ── Quest Board Overlay ──────────────────── -->
-  <div id="quest-overlay" class="modal-overlay hidden">
-    <div class="modal-content quest-board">
-      <div class="modal-header">
-        <h2>📋 Quest Board</h2>
-        <button id="quest-close" class="modal-close">&times;</button>
-      </div>
-      <div id="quest-tabs" class="quest-tabs">
-        <button class="quest-tab active" data-tab="active">Active</button>
-        <button class="quest-tab" data-tab="completed">Completed</button>
-        <button class="quest-tab" data-tab="roster">Team Roster</button>
-        <button class="quest-tab" data-tab="schedules">🌙 Night Shift</button>
-      </div>
-      <div id="quest-content" class="quest-content">
-        <div class="quest-loading">Loading quests...</div>
-      </div>
-    </div>
-  </div>
+
 </body>
 </html>
