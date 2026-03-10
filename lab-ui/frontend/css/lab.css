@@ -127,8 +127,20 @@ body {
   transform: translateY(-50%);  /* anchor: center of sprite at top/left coords */
 }
 
-.agent-sprite:hover { transform: translateY(-50%) scale(1.06); }
-.agent-sprite:active { transform: translateY(-50%) scale(0.97); }
+/* Only Lab Manager (main) and working agents are clickable */
+.agent-sprite[data-id="main"]:hover { transform: translateY(-50%) scale(1.06); }
+.agent-sprite[data-id="main"]:active { transform: translateY(-50%) scale(0.97); }
+.agent-sprite.working:hover { transform: translateY(-50%) scale(1.06); cursor: pointer; }
+.agent-sprite.working:active { transform: translateY(-50%) scale(0.97); }
+
+/* Idle specialists: non-interactive */
+.agent-sprite:not([data-id="main"]):not(.working) {
+  cursor: default;
+  opacity: 0.65;
+}
+.agent-sprite:not([data-id="main"]):not(.working):hover {
+  transform: translateY(-50%);  /* no scale on hover */
+}
 
 .agent-sprite-img {
   image-rendering: pixelated;

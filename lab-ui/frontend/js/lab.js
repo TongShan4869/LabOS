@@ -30,7 +30,7 @@ setInterval(updateBackground, 60000);
 
 const AGENTS = {
   main: {
-    id: "main", name: "醋の虾", role: "Principal Investigator",
+    id: "main", name: "Lab Manager", role: "Lab Orchestrator",
     emoji: "🦞", zone: "pi-desk", color: "#e63946",
     greeting: "Hey! What are you working on today?",
     pos: { left: "72%", top: "33%" },  // PI desk — in front of desk
@@ -127,6 +127,7 @@ function buildAgentSprites() {
     const el = document.createElement("div");
     el.className = "agent-sprite";
     el.id = `agent-${id}`;
+    el.dataset.id = id;
     el.style.left = agent.pos.left;
     el.style.top  = agent.pos.top;
     el.title = `${agent.name} — ${agent.role}`;
@@ -180,15 +181,15 @@ function buildAgentSprites() {
     el._animSeqs = frameSequences;
 
     el.addEventListener("click", () => {
-      // Switch to clicked animation briefly
-      setAgentAnimMode(id, 'clicked', 300);
       if (id === "main") {
+        setAgentAnimMode(id, 'clicked', 300);
         openDialogue("main");
-      } else {
-        // Clicking a specialist opens dialogue with Lab Manager
-        // but shows who you clicked
+      } else if (el.classList.contains("working")) {
+        // Specialists only clickable when working — show their progress
+        setAgentAnimMode(id, 'clicked', 300);
         openDialogue("main", id);
       }
+      // Idle specialists: not clickable (visual-only decoration)
     });
     scene.appendChild(el);
   }
