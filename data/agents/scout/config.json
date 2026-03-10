@@ -6,8 +6,8 @@
   "skills": [
     "lab-lit-scout"
   ],
-  "status": "idle",
-  "lifecycle": "ephemeral",
+  "status": "active",
+  "lifecycle": "persistent",
   "run_count": 0,
   "promotion_threshold": 3,
   "heartbeat_cron": null,

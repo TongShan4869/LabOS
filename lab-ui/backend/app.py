@@ -31,6 +31,8 @@ REPO_DIR     = ROOT_DIR.parent  # LabOS repo root
 import sys as _sys
 _sys.path.insert(0, str(ROOT_DIR / "backend"))
 from lab_manager import (
+    add_schedule, remove_schedule, get_schedules, get_lab_summary,
+    detect_pipeline, PIPELINES,
     detect_delegation, build_lab_manager_prompt, get_agent_config,
     record_agent_run, create_quest, complete_quest, get_active_quests,
     get_all_quests, audit_log, AGENT_REGISTRY, get_agent_usage
@@ -1108,6 +1110,22 @@ When asked "what can you do?", explain your role and capabilities in plain text.
             _run_skill_interactive(agent_id, agent, skill, text, sid)
             return
     
+    # Check for multi-agent pipeline first
+    pipeline_id = detect_pipeline(text)
+    if pipeline_id and pipeline_id in PIPELINES:
+        pipeline = PIPELINES[pipeline_id]
+        print(f"[LAB_MANAGER] Pipeline detected: {pipeline['name']}", flush=True)
+        _emit_agent_reply(agent_id, agent, f"Starting **{pipeline['name']}** pipeline...\n\n" + "\n".join(f"{i+1}. {s['agent'].title()}: {s['description']}" for i, s in enumerate(pipeline['steps'])), sid)
+        # Run first step (subsequent steps need manual trigger for now)
+        first_step = pipeline["steps"][0]
+        target_agent = AGENTS.get(first_step["agent"])
+        if target_agent:
+            quest = create_quest(f"[Pipeline: {pipeline['name']}] {text[:60]}", first_step["agent"])
+            record_agent_run(first_step["agent"])
+            _route_to_agent(first_step["agent"], target_agent, text, sid)
+            complete_quest(quest["id"], f"Step 1/{len(pipeline['steps'])} complete")
+        return
+
     # Lab Manager delegation: detect task intent and route to specialist
     delegated_agent = detect_delegation(text)
     if delegated_agent and delegated_agent != agent_id:
@@ -1126,6 +1144,22 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         quest = create_quest(text[:80], agent_id)
         _run_skill_interactive(agent_id, agent, skill, text, sid)
         complete_quest(quest["id"], "Completed")
+        return
+
+    # Check for multi-agent pipeline first
+    pipeline_id = detect_pipeline(text)
+    if pipeline_id and pipeline_id in PIPELINES:
+        pipeline = PIPELINES[pipeline_id]
+        print(f"[LAB_MANAGER] Pipeline detected: {pipeline['name']}", flush=True)
+        _emit_agent_reply(agent_id, agent, f"Starting **{pipeline['name']}** pipeline...\n\n" + "\n".join(f"{i+1}. {s['agent'].title()}: {s['description']}" for i, s in enumerate(pipeline['steps'])), sid)
+        # Run first step (subsequent steps need manual trigger for now)
+        first_step = pipeline["steps"][0]
+        target_agent = AGENTS.get(first_step["agent"])
+        if target_agent:
+            quest = create_quest(f"[Pipeline: {pipeline['name']}] {text[:60]}", first_step["agent"])
+            record_agent_run(first_step["agent"])
+            _route_to_agent(first_step["agent"], target_agent, text, sid)
+            complete_quest(quest["id"], f"Step 1/{len(pipeline['steps'])} complete")
         return
 
     # Lab Manager delegation: detect task intent and route to specialist
@@ -1797,6 +1831,61 @@ def api_agent_roster():
         usage = get_agent_usage(aid)
         roster.append({**reg, **config, "usage": usage})
     return jsonify(roster)
+
+
+@app.route("/api/lab/stats", methods=["GET"])
+def api_lab_stats():
+    """Comprehensive lab statistics."""
+    roster_stats = []
+    total_runs = 0
+    total_cost = 0.0
+    for aid in AGENT_REGISTRY:
+        usage = get_agent_usage(aid)
+        config = get_agent_config(aid)
+        total_runs += usage.get("runs", 0)
+        total_cost += usage.get("cost_usd", 0.0)
+        roster_stats.append({
+            "id": aid,
+            "name": config.get("name", aid),
+            "runs": usage.get("runs", 0),
+            "lifecycle": config.get("lifecycle", "ephemeral"),
+        })
+    
+    quests = get_all_quests(50)
+    active_quests = [q for q in quests if q["status"] == "active"]
+    done_quests = [q for q in quests if q["status"] == "done"]
+    
+    return jsonify({
+        "total_runs": total_runs,
+        "total_cost": total_cost,
+        "active_quests": len(active_quests),
+        "completed_quests": len(done_quests),
+        "agents": roster_stats,
+        "most_active": max(roster_stats, key=lambda a: a["runs"])["name"] if roster_stats else None,
+    })
+
+
+@app.route("/api/schedules", methods=["GET"])
+def api_schedules():
+    """Get all scheduled agent tasks."""
+    return jsonify(get_schedules())
+
+@app.route("/api/schedules", methods=["POST"])
+def api_add_schedule():
+    """Add a scheduled task."""
+    data = request.json
+    schedule = add_schedule(
+        data.get("agent_id", "scout"),
+        data.get("task", ""),
+        data.get("cron_expr", "0 9 * * 1"),  # Default: Monday 9am
+        data.get("description", "")
+    )
+    return jsonify(schedule)
+
+@app.route("/api/lab/summary", methods=["GET"])
+def api_lab_summary():
+    """Get lab summary text."""
+    return jsonify({"summary": get_lab_summary()})
 
 # ─── Entry ────────────────────────────────────────────────────────────────────
 

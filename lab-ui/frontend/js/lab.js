@@ -1529,3 +1529,73 @@ async function loadRoster() {
     content.innerHTML = '<div class="quest-loading">Failed to load roster.</div>';
   }
 }
+
+// ── Coins Counter (lab cost tracking) ────────────────────────────────────────
+
+async function updateCoins() {
+  try {
+    const res = await fetch(origin + "/api/agents/roster");
+    const roster = await res.json();
+    const totalCost = roster.reduce((sum, a) => sum + (a.usage?.cost_usd || 0), 0);
+    const totalRuns = roster.reduce((sum, a) => sum + (a.usage?.runs || 0), 0);
+    const el = document.getElementById("hud-coins");
+    if (el) {
+      el.textContent = `🪙 ${totalRuns} runs`;
+      el.title = `Total cost: $${totalCost.toFixed(2)} | ${totalRuns} agent runs`;
+    }
+  } catch(e) {}
+}
+
+// Update coins every 30s and on page load
+updateCoins();
+setInterval(updateCoins, 30000);
+
+// ── Night Shift (Schedules) ──────────────────────────────────────────────────
+
+async function loadSchedules() {
+  const content = document.getElementById("quest-content");
+  content.innerHTML = '<div class="quest-loading">Loading schedules...</div>';
+  
+  try {
+    const res = await fetch(origin + "/api/schedules");
+    const schedules = await res.json();
+    
+    if (schedules.length === 0) {
+      content.innerHTML = `
+        <div class="quest-loading">
+          <p>🌙 No scheduled tasks yet.</p>
+          <p style="font-size:12px;color:#888">Tell the Lab Manager to schedule recurring work, like:<br>
+          "Check for new papers in my field every Monday"</p>
+        </div>`;
+      return;
+    }
+    
+    content.innerHTML = schedules.map(s => `
+      <div class="quest-card ${s.enabled ? '' : 'done'}">
+        <div class="quest-title">🌙 ${s.description || s.task}</div>
+        <div class="quest-meta">
+          <span class="quest-agent">🤖 ${s.agent_id}</span>
+          <span>⏰ ${s.cron_expr}</span>
+          <span>${s.run_count} runs</span>
+        </div>
+        ${s.last_run ? `<div style="font-size:11px;color:#666;margin-top:4px">Last run: ${new Date(s.last_run).toLocaleString()}</div>` : ''}
+      </div>
+    `).join("");
+  } catch (e) {
+    content.innerHTML = '<div class="quest-loading">Failed to load schedules.</div>';
+  }
+}
+
+// Update quest tab handler to include schedules
+document.querySelectorAll(".quest-tab").forEach(tab => {
+  tab.removeEventListener("click", tab._handler);
+  tab._handler = () => {
+    document.querySelectorAll(".quest-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const tabName = tab.dataset.tab;
+    if (tabName === "roster") loadRoster();
+    else if (tabName === "schedules") loadSchedules();
+    else loadQuests(tabName);
+  };
+  tab.addEventListener("click", tab._handler);
+});

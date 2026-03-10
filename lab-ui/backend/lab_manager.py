@@ -413,3 +413,72 @@ def detect_pipeline(text: str) -> str | None:
         return "study_design"
     
     return None
+
+
+# --- Night Shift (Scheduled Agent Work) ---
+
+SCHEDULES_FILE = DATA_DIR / "schedules.json"
+
+
+def get_schedules() -> list:
+    """Get all scheduled agent tasks."""
+    if SCHEDULES_FILE.exists():
+        return json.loads(SCHEDULES_FILE.read_text())
+    return []
+
+
+def add_schedule(agent_id: str, task: str, cron_expr: str, description: str = "") -> dict:
+    """Add a scheduled task for an agent."""
+    import uuid
+    schedules = get_schedules()
+    schedule = {
+        "id": str(uuid.uuid4())[:8],
+        "agent_id": agent_id,
+        "task": task,
+        "cron_expr": cron_expr,
+        "description": description or task[:50],
+        "enabled": True,
+        "created_at": datetime.now().isoformat(),
+        "last_run": None,
+        "run_count": 0,
+    }
+    schedules.append(schedule)
+    SCHEDULES_FILE.write_text(json.dumps(schedules, indent=2))
+    
+    # Update agent lifecycle to scheduled
+    update_agent_config(agent_id, {"lifecycle": "scheduled", "heartbeat_cron": cron_expr})
+    audit_log("schedule_created", agent_id, f"Scheduled: {description} ({cron_expr})")
+    return schedule
+
+
+def remove_schedule(schedule_id: str) -> bool:
+    """Remove a scheduled task."""
+    schedules = get_schedules()
+    schedules = [s for s in schedules if s["id"] != schedule_id]
+    SCHEDULES_FILE.write_text(json.dumps(schedules, indent=2))
+    return True
+
+
+def get_lab_summary() -> str:
+    """Generate a text summary of lab status for the Lab Manager."""
+    agents_summary = []
+    for aid, reg in AGENT_REGISTRY.items():
+        config = get_agent_config(aid)
+        usage = get_agent_usage(aid)
+        agents_summary.append(
+            f"- {reg['name']}: {usage.get('runs', 0)} runs, {config.get('lifecycle', 'ephemeral')}"
+        )
+    
+    quests = get_all_quests(10)
+    active = [q for q in quests if q["status"] == "active"]
+    done = [q for q in quests if q["status"] == "done"]
+    
+    schedules = get_schedules()
+    active_schedules = [s for s in schedules if s.get("enabled")]
+    
+    return f"""## Lab Summary
+- Active quests: {len(active)}
+- Completed quests: {len(done)}
+- Scheduled tasks: {len(active_schedules)}
+- Team:
+{chr(10).join(agents_summary)}"""
