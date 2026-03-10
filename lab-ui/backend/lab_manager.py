@@ -482,3 +482,40 @@ def get_lab_summary() -> str:
 - Scheduled tasks: {len(active_schedules)}
 - Team:
 {chr(10).join(agents_summary)}"""
+
+
+# --- Auto-Archive ---
+
+def check_and_archive_idle_agents(idle_days: int = 7):
+    """Archive agents that haven't been used in idle_days."""
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(days=idle_days)
+    
+    archived = []
+    for aid in AGENT_REGISTRY:
+        config = get_agent_config(aid)
+        if config.get("lifecycle") != "persistent":
+            continue
+        
+        usage = get_agent_usage(aid)
+        last_active = usage.get("last_active")
+        if last_active:
+            last_dt = datetime.fromisoformat(last_active)
+            if last_dt < cutoff:
+                update_agent_config(aid, {"lifecycle": "archived", "status": "archived"})
+                audit_log("archived", aid, f"Auto-archived after {idle_days} days idle")
+                archived.append(aid)
+    
+    return archived
+
+
+def get_agent_status_emoji(agent_id: str) -> str:
+    """Get status emoji for pixel UI."""
+    config = get_agent_config(agent_id)
+    lifecycle = config.get("lifecycle", "ephemeral")
+    return {
+        "ephemeral": "💤",
+        "persistent": "🟢",
+        "scheduled": "⏰",
+        "archived": "📦",
+    }.get(lifecycle, "❓")

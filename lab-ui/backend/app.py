@@ -1047,6 +1047,8 @@ def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
     # Use Lab Manager prompt for main agent
     if agent_id == "main":
         system_prompt = build_lab_manager_prompt()
+        # Add live lab summary
+        system_prompt += "\n" + get_lab_summary()
     else:
         system_prompt = AGENT_PROMPTS.get(agent_id, "You are a helpful research assistant.")
     system_prompt += """\n\nFORMATTING: Always format responses in Markdown (##, bullets, **bold**, tables).
