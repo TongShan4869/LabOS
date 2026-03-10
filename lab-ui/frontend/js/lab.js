@@ -1604,10 +1604,19 @@ async function dashRefreshMemory() {
   if (!el) return;
   
   try {
-    const res = await fetch(origin + `/api/agent-memory/${agent}`);
+    const res = await fetch(origin + `/api/agents/${agent}/memory`);
     const data = await res.json();
-    const memory = data.memory || "No memory recorded yet.";
-    el.innerHTML = `<div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px;font-size:13px;color:#ccc;white-space:pre-wrap;max-height:300px;overflow-y:auto">${memory}</div>`;
+    const entries = data.memory || [];
+    if (!entries.length) {
+      el.innerHTML = '<div class="dash-loading">No memory recorded yet.</div>';
+      return;
+    }
+    el.innerHTML = entries.map(e => `
+      <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:13px">
+        <span style="color:#ccc">${e.text}</span>
+        <span style="color:#555;font-size:11px;float:right">${new Date(e.timestamp).toLocaleDateString()}</span>
+      </div>
+    `).join("");
   } catch {
     el.innerHTML = '<div class="dash-loading">Could not load memory.</div>';
   }

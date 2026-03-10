@@ -619,6 +619,7 @@ def _load_reports(project_id: str) -> list:
     for report_file in sorted(reports_dir.glob("*.json"), reverse=True):
         try:
             report = json.loads(report_file.read_text())
+            report["filename"] = report_file.name  # inject filename for fetching
             reports.append(report)
         except Exception:
             pass
@@ -882,6 +883,49 @@ def api_projects_reports(project_id):
     """Get all reports for a project."""
     reports = _load_reports(project_id)
     return jsonify({"reports": reports})
+
+
+@app.route("/api/reports", methods=["GET"])
+def api_reports():
+    """Get all reports for the active project."""
+    project_id = _get_active_project_id()
+    if not project_id:
+        return jsonify([])
+    reports = _load_reports(project_id)
+    # Return flat list with filename for fetching individual reports
+    result = []
+    for r in reports:
+        # Extract title from first line of text or use agent name
+        title = "Untitled Report"
+        text = r.get("text", "")
+        for line in text.split("\n"):
+            line = line.strip().lstrip("#").strip()
+            if line:
+                title = line[:80]
+                break
+        result.append({
+            "filename": r.get("filename", ""),
+            "title": title,
+            "agent_id": r.get("agent_id", "unknown"),
+            "timestamp": r.get("timestamp", ""),
+        })
+    return jsonify(result)
+
+
+@app.route("/api/report/<filename>", methods=["GET"])
+def api_report_detail(filename):
+    """Get a single report by filename."""
+    project_id = _get_active_project_id()
+    if not project_id:
+        return jsonify({"error": "No active project"}), 404
+    report_file = PROJECTS_DIR / project_id / "reports" / filename
+    if not report_file.exists():
+        return jsonify({"error": "Report not found"}), 404
+    try:
+        report = json.loads(report_file.read_text())
+        return jsonify(report)
+    except Exception:
+        return jsonify({"error": "Failed to read report"}), 500
 
 
 @app.route("/api/projects/<project_id>/chats/<agent_id>", methods=["GET"])
