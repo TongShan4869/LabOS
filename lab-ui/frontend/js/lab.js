@@ -182,7 +182,13 @@ function buildAgentSprites() {
     el.addEventListener("click", () => {
       // Switch to clicked animation briefly
       setAgentAnimMode(id, 'clicked', 300);
-      openDialogue(id);
+      if (id === "main") {
+        openDialogue("main");
+      } else {
+        // Clicking a specialist opens dialogue with Lab Manager
+        // but shows who you clicked
+        openDialogue("main", id);
+      }
     });
     scene.appendChild(el);
   }
@@ -325,7 +331,7 @@ function setAgentAnimMode(agentId, mode, revertMs) {
   }
 }
 
-function openDialogue(agentId) {
+function openDialogue(agentId, clickedSpecialist) {
   const agent = AGENTS[agentId];
   if (!agent) return;
 
@@ -374,9 +380,18 @@ function openDialogue(agentId) {
     ? lastAgentMsg.text
     : agent.greeting;
 
-  typewrite(greetText, () => {
-    dlgInput.focus();
-  });
+  // If specialist was clicked, show a contextual greeting
+  if (clickedSpecialist && AGENTS[clickedSpecialist]) {
+    const spec = AGENTS[clickedSpecialist];
+    typewrite(`You clicked on ${spec.name}. Want me to assign them a task? Just tell me what you need!`, () => {
+      dlgInput.focus();
+      dlgInput.placeholder = `Ask Lab Manager to use ${spec.name}...`;
+    });
+  } else {
+    typewrite(greetText, () => {
+      dlgInput.focus();
+    });
+  }
 
   // Scroll history to bottom
   setTimeout(() => { dlgHistory.scrollTop = dlgHistory.scrollHeight; }, 50);
