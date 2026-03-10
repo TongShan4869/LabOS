@@ -376,3 +376,40 @@ if __name__ == "__main__":
     for t in tests:
         agent = detect_delegation(t)
         print(f"  '{t}' → {agent or 'Lab Manager (direct)'}")
+
+
+# --- Agent Pipelines ---
+
+PIPELINES = {
+    "lit_review": {
+        "name": "Literature Review Pipeline",
+        "steps": [
+            {"agent": "scout", "action": "search", "description": "Find relevant papers"},
+            {"agent": "critic", "action": "review", "description": "Review and critique findings"},
+            {"agent": "quill", "action": "summarize", "description": "Write synthesis report"},
+        ],
+    },
+    "study_design": {
+        "name": "Study Design Pipeline", 
+        "steps": [
+            {"agent": "sage", "action": "advise", "description": "Research strategy"},
+            {"agent": "stat", "action": "design", "description": "Statistical design + power analysis"},
+        ],
+    },
+}
+
+
+def detect_pipeline(text: str) -> str | None:
+    """Detect if a request needs a multi-agent pipeline."""
+    import re
+    text_lower = text.lower()
+    
+    # Lit review pipeline triggers
+    if re.search(r"(full|comprehensive|systematic)\\s*(lit|literature)\s*(review|search|survey)", text_lower):
+        return "lit_review"
+    
+    # Study design pipeline triggers
+    if re.search(r"(design|plan)\\s*(a|my|the)?\s*(study|experiment|trial)", text_lower):
+        return "study_design"
+    
+    return None
