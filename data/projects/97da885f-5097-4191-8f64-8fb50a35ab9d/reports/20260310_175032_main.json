@@ -1,0 +1,7 @@
+{
+  "agent_id": "main",
+  "agent_name": "\u918b\u306e\u867e",
+  "text": "Hey Cu! Here's your lab status \ud83e\uddea\n\n## \ud83d\udd2c Cu Lab \u2014 Status Report\n\n**Active Project:** Neural Coupling (Neuroscience)\n**Field:** Speech/music neural processing, neural coupling, ASD clinical populations\n\n---\n\n### \ud83d\udc65 Team Roster\n\n| Agent | Role | Status |\n|-------|------|--------|\n| **Scout** | Literature search (PubMed, OpenAlex, arXiv) | \ud83d\udfe1 idle |\n| **Stat** | Statistical analysis & study design | \ud83d\udfe1 idle |\n| **Quill** | Scientific writing & editing | \ud83d\udfe1 idle |\n| **Critic** | Paper review & methodology critique | \ud83d\udfe1 idle |\n| **Sage** | Research strategy & grant planning | \ud83d\udfe1 idle |\n| **Trend** | Research trend analysis & field mapping | \ud83d\udfe1 idle |\n| **Warden** | Reproducibility checks | \ud83d\udfe1 idle |\n\n---\n\n### \ud83d\udccc Active Quests\n\n- **Find papers about neural coupling in music** \u2192 assigned to Scout\n\nLooks like Scout was tasked with that lit search but hasn't been dispatched yet in this session. Want me to kick that off? I'll send Scout out to dig through PubMed, OpenAlex, and arXiv for neural coupling in music papers \ud83e\udd9e",
+  "timestamp": "2026-03-10T17:50:32.237163",
+  "project_id": "97da885f-5097-4191-8f64-8fb50a35ab9d"
+}

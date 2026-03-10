@@ -1425,3 +1425,92 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[INIT] All UI listeners registered');
   } catch(e) { console.error('[INIT] Error:', e); }
 });
+
+// ── Quest Board ──────────────────────────────
+
+document.getElementById("hud-quests")?.addEventListener("click", () => {
+  const overlay = document.getElementById("quest-overlay");
+  overlay.classList.toggle("hidden");
+  if (!overlay.classList.contains("hidden")) {
+    loadQuests("active");
+  }
+});
+
+document.getElementById("quest-close")?.addEventListener("click", () => {
+  document.getElementById("quest-overlay").classList.add("hidden");
+});
+
+// Tab switching
+document.querySelectorAll(".quest-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".quest-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const tabName = tab.dataset.tab;
+    if (tabName === "roster") {
+      loadRoster();
+    } else {
+      loadQuests(tabName);
+    }
+  });
+});
+
+async function loadQuests(filter) {
+  const content = document.getElementById("quest-content");
+  content.innerHTML = '<div class="quest-loading">Loading...</div>';
+  
+  try {
+    const res = await fetch(origin + "/api/quests?all=true");
+    const quests = await res.json();
+    
+    const filtered = filter === "active" 
+      ? quests.filter(q => q.status === "active")
+      : quests.filter(q => q.status === "done");
+    
+    if (filtered.length === 0) {
+      content.innerHTML = `<div class="quest-loading">${filter === "active" ? "No active quests. Talk to the Lab Manager!" : "No completed quests yet."}</div>`;
+      return;
+    }
+    
+    content.innerHTML = filtered.map(q => `
+      <div class="quest-card ${q.status}">
+        <div class="quest-title">${q.title}</div>
+        <div class="quest-meta">
+          <span class="quest-agent">🤖 ${q.assigned_to}</span>
+          <span class="quest-xp">✨ ${q.xp_reward} XP</span>
+          <span>${q.status === "done" ? "Completed " + new Date(q.completed_at).toLocaleDateString() : "Started " + new Date(q.created_at).toLocaleDateString()}</span>
+        </div>
+        ${q.result_summary ? `<div style="font-size:12px;color:#aaa;margin-top:6px">${q.result_summary}</div>` : ""}
+      </div>
+    `).join("");
+  } catch (e) {
+    content.innerHTML = '<div class="quest-loading">Failed to load quests.</div>';
+  }
+}
+
+async function loadRoster() {
+  const content = document.getElementById("quest-content");
+  content.innerHTML = '<div class="quest-loading">Loading team...</div>';
+  
+  try {
+    const res = await fetch(origin + "/api/agents/roster");
+    const roster = await res.json();
+    
+    content.innerHTML = roster.map(a => `
+      <div class="roster-card">
+        <img class="roster-avatar" src="${origin}/assets/avatars/avatar-${a.id}.png" onerror="this.style.display='none'">
+        <div class="roster-info">
+          <div class="roster-name">${a.name}</div>
+          <div class="roster-specialty">${a.specialty}</div>
+          <div class="roster-stats">
+            🏃 ${a.usage.runs} runs · 
+            🪙 ${a.usage.cost_usd.toFixed(2)} USD ·
+            ${a.usage.last_active ? "Last active: " + new Date(a.usage.last_active).toLocaleDateString() : "Never used"}
+          </div>
+        </div>
+        <span class="roster-lifecycle ${a.lifecycle}">${a.lifecycle}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    content.innerHTML = '<div class="quest-loading">Failed to load roster.</div>';
+  }
+}

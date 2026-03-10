@@ -1,0 +1,7 @@
+{
+  "agent_id": "main",
+  "agent_name": "\u918b\u306e\u867e",
+  "text": "Hey Cu! \ud83e\udd9e\n\nHere's your lab status rundown:\n\n## \ud83d\udd2c Lab Overview\n\n**PI:** Cu (that's you)\n**Lab Coordinator:** \u918b\u306e\u867e (that's me \ud83e\udd90)\n**Affiliation:** Stanford Medicine, Dr. Daniel Abrams' group\n**Focus:** Speech/music neural processing, neural coupling, ASD clinical populations, infant hearing\n\n## \ud83d\udccb Current State\n\nHonestly, my memory's pretty light on active project tracking right now \u2014 I don't have a running project board set up yet. Here's what I *do* know:\n\n- **Research themes:** Subcortical vs cortical encoding of music/speech, speaker-listener neural coupling, DNN-generated visual speech aids\n- **You just asked about neural coupling in music papers** \u2014 want me to kick off a literature search on that? Could be Scout's job if we had one, but I can handle it \ud83e\udd9e\n\n## \ud83d\udee0\ufe0f What I'd Recommend\n\nTo make \"lab status\" actually useful going forward, we could set up:\n\n1. **A project tracker** (Notion DB or Bitable) with active projects, deadlines, milestones\n2. **Agent roster** \u2014 assign Scout (lit review), Stat (analysis), etc.\n3. **Weekly status cron** \u2014 auto-summary every Monday\n\nWant me to set any of that up? Or should I start with that neural coupling literature search first?",
+  "timestamp": "2026-03-10T17:48:48.877120",
+  "project_id": "97da885f-5097-4191-8f64-8fb50a35ab9d"
+}

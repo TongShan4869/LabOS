@@ -21,6 +21,7 @@
       <span id="hud-title">LabOS</span>
     </div>
     <div id="hud-right">
+      <button id="hud-quests" class="hud-btn" title="Quest Board">📋</button>
       <button id="hud-filing" class="hud-btn" title="Filing Cabinet">📂</button>
         <button id="hud-chatlog" class="hud-btn" title="Chat Log">📜</button>
         <button id="hud-daynight" class="hud-btn" title="Toggle Day/Night">🌙</button>
@@ -309,6 +310,24 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="js/lab.js?v=20260309h"></script>
+  <script src="js/lab.js?v=20260310a"></script>
+
+  <!-- ── Quest Board Overlay ──────────────────── -->
+  <div id="quest-overlay" class="modal-overlay hidden">
+    <div class="modal-content quest-board">
+      <div class="modal-header">
+        <h2>📋 Quest Board</h2>
+        <button id="quest-close" class="modal-close">&times;</button>
+      </div>
+      <div id="quest-tabs" class="quest-tabs">
+        <button class="quest-tab active" data-tab="active">Active</button>
+        <button class="quest-tab" data-tab="completed">Completed</button>
+        <button class="quest-tab" data-tab="roster">Team Roster</button>
+      </div>
+      <div id="quest-content" class="quest-content">
+        <div class="quest-loading">Loading quests...</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

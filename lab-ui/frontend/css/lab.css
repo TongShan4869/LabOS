@@ -1664,3 +1664,134 @@ body {
 
 /* Universal hidden override */
 .hidden { display: none !important; }
+
+/* ── Quest Board ────────────────────────────── */
+.quest-board {
+  max-width: 600px;
+  max-height: 80vh;
+}
+
+.quest-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #3a3a5c;
+  padding-bottom: 8px;
+}
+
+.quest-tab {
+  background: #2a2a4a;
+  border: 1px solid #3a3a5c;
+  color: #ccc;
+  padding: 6px 14px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.quest-tab.active {
+  background: #4a4a7a;
+  color: #fff;
+  border-color: #6a6aaa;
+}
+
+.quest-content {
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.quest-card {
+  background: #1e1e3a;
+  border: 1px solid #3a3a5c;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.quest-card .quest-title {
+  font-weight: bold;
+  color: #e0e0ff;
+  margin-bottom: 4px;
+}
+
+.quest-card .quest-meta {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  justify-content: space-between;
+}
+
+.quest-card .quest-agent {
+  color: #8888ff;
+}
+
+.quest-card .quest-xp {
+  color: #ffd700;
+}
+
+.quest-card.done {
+  opacity: 0.7;
+  border-color: #2a5a2a;
+}
+
+.quest-card.done .quest-title::before {
+  content: "✅ ";
+}
+
+/* Agent roster cards */
+.roster-card {
+  background: #1e1e3a;
+  border: 1px solid #3a3a5c;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roster-card .roster-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  image-rendering: pixelated;
+}
+
+.roster-card .roster-info {
+  flex: 1;
+}
+
+.roster-card .roster-name {
+  font-weight: bold;
+  color: #e0e0ff;
+}
+
+.roster-card .roster-specialty {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+.roster-card .roster-stats {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.roster-card .roster-lifecycle {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.roster-lifecycle.ephemeral { background: #333; color: #999; }
+.roster-lifecycle.persistent { background: #2a4a2a; color: #6f6; }
+.roster-lifecycle.scheduled { background: #4a4a2a; color: #ff6; }
+
+/* Coins in HUD */
+#hud-coins {
+  color: #ffd700;
+  font-size: 13px;
+  margin-right: 8px;
+}

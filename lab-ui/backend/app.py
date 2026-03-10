@@ -1042,7 +1042,11 @@ def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
     skill = agent.get("skill")
     
     # Build context: system prompt + memory + conversation history
-    system_prompt = AGENT_PROMPTS.get(agent_id, "You are a helpful research assistant.")
+    # Use Lab Manager prompt for main agent
+    if agent_id == "main":
+        system_prompt = build_lab_manager_prompt()
+    else:
+        system_prompt = AGENT_PROMPTS.get(agent_id, "You are a helpful research assistant.")
     system_prompt += """\n\nFORMATTING: Always format responses in Markdown (##, bullets, **bold**, tables).
 
 PAPER SUMMARIES: When summarizing or discussing papers, ALWAYS include for EACH paper:
