@@ -1,9 +1,34 @@
 # LabOS — Product Requirements Document
 
-> **Version:** 0.1 (Brainstorm Draft)
+> **Version:** 2.0
 > **Created:** 2026-03-03
+> **Updated:** 2026-03-10 (v2 — Lab Manager architecture)
 > **Author:** Cu + 醋の虾
-> **Status:** Pre-development — idea stage
+> **Status:** Active development — Lab Manager v2 shipped
+
+---
+
+## 0. What Changed in v2 (2026-03-10)
+
+### Lab Manager Architecture
+- **Single entry point**: User talks to one Lab Manager agent. It delegates to specialists automatically.
+- **No manual agent selection**: Regex-based intent detection routes tasks to Scout, Stat, Quill, etc.
+- **Quest Board**: Every delegated task becomes a tracked quest with XP rewards.
+- **Agent Lifecycle**: Ephemeral → Persistent (3+ runs) → Scheduled (cron) → Archived (7d idle).
+- **Multi-agent Pipelines**: "Comprehensive lit review" triggers Scout → Critic → Quill chain.
+- **Audit Log**: Immutable append-only log of all agent actions.
+- **Night Shift**: Scheduled cron tasks for agents (e.g., weekly paper monitoring).
+
+### LifeOS Vision
+- LabOS is **Floor 1** of a pixel art building where each floor runs a part of your life.
+- Users can build their own floors with custom skills and share them.
+- See `docs/vision.md` for the full concept.
+
+### Architecture Changes
+- `lab_manager.py`: New orchestration engine with delegation, quest board, audit, scheduling.
+- `app.py`: Lab Manager as default system prompt for main agent, pipeline detection.
+- Frontend: Quest Board UI (📋), Team Roster, Night Shift tab, Coins counter.
+- APIs: `/api/quests`, `/api/agents/roster`, `/api/lab/stats`, `/api/schedules`.
 
 ---
 
@@ -618,3 +643,5 @@ User's current level and XP shown in the office UI header. Level-up triggers a v
 ---
 
 *Next step: draft `lab-init` SKILL.md — the foundation everything else builds on.*
+
+| 2026-03-10 | 2.0 | Lab Manager v2: single entry point, auto-delegation, quest board, agent lifecycle, multi-agent pipelines, night shift, audit log, LifeOS vision |

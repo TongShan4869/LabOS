@@ -107,31 +107,40 @@ Your config is saved to `LAB_CONFIG.json`. LabOS won't ask again unless you dele
 
 ---
 
-## 6. Meet Your Agents
+## 6. Meet Your Team
 
-Click on any agent sprite in the lab to start chatting:
+**Click any agent sprite** to talk through the **Lab Manager** — your orchestrator who delegates tasks automatically.
 
-| Agent | Role | What They Do |
+| Agent | Role | Auto-triggers on... |
 |---|---|---|
-| 🔍 **Scout** | Literature Scout | Searches PubMed, OpenAlex, arXiv for papers |
-| 🧠 **Sage** | Research Advisor | Socratic mentor — asks the hard questions |
-| ✍️ **Quill** | Writing Assistant | Drafts intros, methods, abstracts |
-| 📊 **Stat** | Biostatistician | Study design, stats analysis |
-| 🔬 **Critic** | Peer Reviewer | Simulates rigorous peer review |
-| 📰 **Trend** | Field Monitor | Weekly digest of new papers |
-| 📚 **Main** | Publishing Assistant | Journal selection, submission prep |
-| 🔒 **Warden** | Security | Protects research IP |
+| 🧑‍🔬 **Lab Manager** | Orchestrator | Greetings, status, general questions |
+| 🔍 **Scout** | Literature search | "find/search papers on X" |
+| 📊 **Stat** | Biostatistician | "analyze/stats/power/sample size" |
+| ✍️ **Quill** | Writing assistant | "draft/write/edit my paper" |
+| 🔬 **Critic** | Peer reviewer | "review/critique this paper" |
+| 🧠 **Sage** | Research advisor | "research strategy/career advice" |
+| 📰 **Trend** | Trend analyst | "what's trending/emerging" |
+| 🔒 **Warden** | Security | "reproducibility/validate" |
 
 ### Example Conversations
 
-- Click **Scout** → *"Find me papers on neural coupling in speech perception"*
-- Click **Sage** → *"What are the gaps in my hypothesis about subcortical encoding?"*
-- Click **Quill** → *"Draft my introduction section"*
-- Click **Stat** → *"Is a mixed-effects model appropriate for my repeated-measures design?"*
+Just talk to any agent — the Lab Manager routes it:
+
+- *"Find me papers on neural coupling in speech perception"* → Scout runs lit-scout
+- *"What's the status of my lab?"* → Lab Manager responds directly
+- *"Do a comprehensive literature review on ASD"* → Pipeline: Scout → Critic → Quill
+- *"Is a mixed-effects model appropriate here?"* → Stat handles it
 
 ---
 
 ## 7. Key Features
+
+### 📋 Quest Board
+Click 📋 to see:
+- **Active quests** — tasks being worked on
+- **Completed quests** — history with XP earned
+- **Team Roster** — agent stats, lifecycle badges, usage
+- **Night Shift** — scheduled recurring agent work
 
 ### 📂 Filing Cabinet
 Click the 📂 button (top-right) to browse:

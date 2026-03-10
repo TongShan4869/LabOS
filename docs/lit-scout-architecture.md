@@ -1,3 +1,5 @@
+> **v2 Note:** In Lab Manager architecture, Scout is auto-delegated when the user asks for literature search. The Lab Manager detects search intent and routes to Scout — no manual agent selection needed.
+
 # Literature Scout — Architecture & Search Strategy
 
 > How `lab-lit-scout` finds, scores, and summarizes academic papers.
