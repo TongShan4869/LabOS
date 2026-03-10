@@ -1,7 +1,7 @@
 {
-  "scout": {
-    "status": "idle",
-    "detail": "",
-    "updated": "2026-03-09T16:16:25.869315"
+  "main": {
+    "status": "working",
+    "detail": "Processing: find papers about neural coupling in mus\u2026",
+    "updated": "2026-03-10T17:45:03.207279"
   }
 }

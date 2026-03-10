@@ -1,0 +1,16 @@
+{
+  "id": "trend",
+  "name": "Trend",
+  "sprite": "sprite-trend.png",
+  "specialty": "Research trend analysis and field mapping",
+  "skills": [
+    "lab-trend-tracker"
+  ],
+  "status": "idle",
+  "lifecycle": "ephemeral",
+  "run_count": 0,
+  "promotion_threshold": 3,
+  "heartbeat_cron": null,
+  "created_at": "2026-03-10T17:42:56.692142",
+  "last_active": null
+}

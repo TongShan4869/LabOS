@@ -28,6 +28,13 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 SKILLS_DIR   = ROOT_DIR.parent / "skills"
 LAB_DIR      = Path(os.environ.get("LAB_DIR", Path.home() / ".openclaw/workspace/lab"))
 REPO_DIR     = ROOT_DIR.parent  # LabOS repo root
+import sys as _sys
+_sys.path.insert(0, str(ROOT_DIR / "backend"))
+from lab_manager import (
+    detect_delegation, build_lab_manager_prompt, get_agent_config,
+    record_agent_run, create_quest, complete_quest, get_active_quests,
+    get_all_quests, audit_log, AGENT_REGISTRY, get_agent_usage
+)
 STATE_FILE   = ROOT_DIR / "state.json"
 AGENTS_FILE  = ROOT_DIR / "agents-state.json"
 XP_FILE      = LAB_DIR / "xp.json"
@@ -1097,23 +1104,45 @@ When asked "what can you do?", explain your role and capabilities in plain text.
             _run_skill_interactive(agent_id, agent, skill, text, sid)
             return
     
-    # For scout: if user clearly wants a search, skip LLM and go straight to skill
-    if agent_id == "scout" and skill:
-        import re as _re
-        _search_pat = _re.compile(r"(search|find|look for|look up|get|fetch|discover)\b.*(paper|article|literature|publication|study|studies)", _re.I)
-        if _search_pat.search(text):
-            _emit_agent_reply(agent_id, agent, "Searching for papers...\n\n" + chr(9203) + " Running skill...", sid)
-            _run_skill_interactive(agent_id, agent, skill, text, sid)
+    # Lab Manager delegation: detect task intent and route to specialist
+    delegated_agent = detect_delegation(text)
+    if delegated_agent and delegated_agent != agent_id:
+        # Re-route to the correct specialist
+        target_agent = AGENTS.get(delegated_agent)
+        if target_agent:
+            print(f"[LAB_MANAGER] Delegating to {delegated_agent}: {text[:50]}", flush=True)
+            _route_to_agent(delegated_agent, target_agent, text, sid)
             return
+    
+    # Direct skill execution when intent matches the current agent
+    if delegated_agent == agent_id and skill:
+        agent_name = agent.get("name", agent_id.title())
+        _emit_agent_reply(agent_id, agent, f"{agent_name} is on it...\n\n" + chr(9203) + " Running skill...", sid)
+        record_agent_run(agent_id)
+        quest = create_quest(text[:80], agent_id)
+        _run_skill_interactive(agent_id, agent, skill, text, sid)
+        complete_quest(quest["id"], "Completed")
+        return
 
-    # For scout: if user clearly wants a search, skip LLM and go straight to skill
-    if agent_id == "scout" and skill:
-        import re as _re
-        _search_pat = _re.compile(r"(search|find|look for|look up|get|fetch|discover)\b.*(paper|article|literature|publication|study|studies)", _re.I)
-        if _search_pat.search(text):
-            _emit_agent_reply(agent_id, agent, "Searching for papers...\n\n" + chr(9203) + " Running skill...", sid)
-            _run_skill_interactive(agent_id, agent, skill, text, sid)
+    # Lab Manager delegation: detect task intent and route to specialist
+    delegated_agent = detect_delegation(text)
+    if delegated_agent and delegated_agent != agent_id:
+        # Re-route to the correct specialist
+        target_agent = AGENTS.get(delegated_agent)
+        if target_agent:
+            print(f"[LAB_MANAGER] Delegating to {delegated_agent}: {text[:50]}", flush=True)
+            _route_to_agent(delegated_agent, target_agent, text, sid)
             return
+    
+    # Direct skill execution when intent matches the current agent
+    if delegated_agent == agent_id and skill:
+        agent_name = agent.get("name", agent_id.title())
+        _emit_agent_reply(agent_id, agent, f"{agent_name} is on it...\n\n" + chr(9203) + " Running skill...", sid)
+        record_agent_run(agent_id)
+        quest = create_quest(text[:80], agent_id)
+        _run_skill_interactive(agent_id, agent, skill, text, sid)
+        complete_quest(quest["id"], "Completed")
+        return
 
     # Call LLM
     response = _run_llm(messages)
@@ -1738,6 +1767,32 @@ def start_broadcast():
     _broadcast_started = True
     broadcast_thread = threading.Thread(target=_broadcast_status, daemon=True)
     broadcast_thread.start()
+
+
+# ─── Quest Board API ──────────────────────────────────────────────────────────
+
+@app.route("/api/quests", methods=["GET"])
+def api_quests():
+    """Get quests (active or all)."""
+    show_all = request.args.get("all", "false") == "true"
+    if show_all:
+        return jsonify(get_all_quests())
+    return jsonify(get_active_quests())
+
+@app.route("/api/agents/<agent_id>/usage", methods=["GET"])
+def api_agent_usage(agent_id):
+    """Get agent usage stats."""
+    return jsonify(get_agent_usage(agent_id))
+
+@app.route("/api/agents/roster", methods=["GET"])
+def api_agent_roster():
+    """Get full agent roster with configs and usage."""
+    roster = []
+    for aid, reg in AGENT_REGISTRY.items():
+        config = get_agent_config(aid)
+        usage = get_agent_usage(aid)
+        roster.append({**reg, **config, "usage": usage})
+    return jsonify(roster)
 
 # ─── Entry ────────────────────────────────────────────────────────────────────
 

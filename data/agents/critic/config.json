@@ -1,0 +1,16 @@
+{
+  "id": "critic",
+  "name": "Critic",
+  "sprite": "sprite-critic.png",
+  "specialty": "Paper review, methodology critique, gap analysis",
+  "skills": [
+    "lab-review-assistant"
+  ],
+  "status": "idle",
+  "lifecycle": "ephemeral",
+  "run_count": 0,
+  "promotion_threshold": 3,
+  "heartbeat_cron": null,
+  "created_at": "2026-03-10T17:42:56.691922",
+  "last_active": null
+}
