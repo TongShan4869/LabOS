@@ -3,3 +3,5 @@
 {"timestamp": "2026-03-10T17:58:22.250959", "action": "promotion", "agent_id": "scout", "detail": "Auto-promoted to persistent after 3 runs"}
 {"timestamp": "2026-03-10T17:58:22.251532", "action": "quest_created", "agent_id": "scout", "detail": "do a comprehensive literature review on speech-in-noise perception"}
 {"timestamp": "2026-03-10T17:58:44.659632", "action": "quest_completed", "agent_id": "scout", "detail": "do a comprehensive literature review on speech-in-noise perception (+50 XP)"}
+{"timestamp": "2026-03-11T05:26:12.912962", "action": "quest_created", "agent_id": "scout", "detail": "find papers about auditory brainstem response"}
+{"timestamp": "2026-03-11T05:26:35.006001", "action": "quest_completed", "agent_id": "scout", "detail": "find papers about auditory brainstem response (+50 XP)"}

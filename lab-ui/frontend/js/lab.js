@@ -661,6 +661,58 @@ function connectSocket() {
   socket.on("connect_error", () => {
     showToast("⚠️ Cannot reach lab server");
   });
+
+  // ── Live Events (Paperclip-inspired invalidation) ────────────────────────
+  // Server pushes lightweight events; frontend refetches from REST APIs.
+  socket.on("live_event", (event) => {
+    console.log("📡 Live event:", event.type, event.payload);
+    
+    const handlers = {
+      "quest.created": () => {
+        updateCoins();
+        // If quest board is open, refresh it
+        const questPanel = document.getElementById("quest-panel");
+        if (questPanel && !questPanel.classList.contains("hidden")) {
+          const activeTab = document.querySelector(".quest-tab.active");
+          if (activeTab) activeTab.click();
+        }
+        // Show toast
+        const p = event.payload;
+        if (p.agent_id && p.title) {
+          showToast(`📋 New quest: ${p.title} → ${p.agent_id}`);
+        }
+      },
+      "quest.completed": () => {
+        updateCoins();
+        const questPanel = document.getElementById("quest-panel");
+        if (questPanel && !questPanel.classList.contains("hidden")) {
+          const activeTab = document.querySelector(".quest-tab.active");
+          if (activeTab) activeTab.click();
+        }
+        showToast("✅ Quest completed!");
+      },
+      "agent.status": () => {
+        const p = event.payload;
+        if (p.agent_id) {
+          updateAgentStatus(p.agent_id, p.status, p.detail || "");
+        }
+      },
+      "agent.promoted": () => {
+        const p = event.payload;
+        showToast(`🎉 ${p.agent_id} promoted to ${p.lifecycle}!`);
+        updateCoins();
+      },
+      "lab.stats": () => {
+        updateCoins();
+      },
+      "run.completed": () => {
+        updateCoins();
+      }
+    };
+    
+    const handler = handlers[event.type];
+    if (handler) handler();
+  });
 }
 
 

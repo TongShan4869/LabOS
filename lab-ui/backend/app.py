@@ -38,6 +38,30 @@ from lab_manager import (
     get_all_quests, audit_log, AGENT_REGISTRY, get_agent_usage
 )
 STATE_FILE   = ROOT_DIR / "state.json"
+
+# ─── Live Event System (Paperclip-inspired) ──────────────────────────────────
+# Bidirectional: client sends chat via socket, server pushes events for state changes.
+# Frontend refetches from REST APIs on invalidation events instead of receiving full data.
+
+def publish_event(event_type: str, payload: dict = None, sid: str = None):
+    """Publish a live event to connected clients.
+    
+    Event types:
+      quest.created / quest.completed — invalidate quest board
+      agent.status                    — agent working/idle/error
+      agent.promoted / agent.archived — lifecycle change
+      lab.stats                       — invalidate coins, stats
+      run.started / run.completed     — invalidate agent usage
+    """
+    event = {
+        "type": event_type,
+        "payload": payload or {},
+        "ts": datetime.now().isoformat()
+    }
+    if sid:
+        socketio.emit("live_event", event, to=sid)
+    else:
+        socketio.emit("live_event", event)
 AGENTS_FILE  = ROOT_DIR / "agents-state.json"
 XP_FILE      = LAB_DIR / "xp.json"
 MEMORY_DIR   = Path.home() / ".openclaw/workspace/memory"
@@ -1123,7 +1147,9 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         target_agent = AGENTS.get(first_step["agent"])
         if target_agent:
             quest = create_quest(f"[Pipeline: {pipeline['name']}] {text[:60]}", first_step["agent"])
-            record_agent_run(first_step["agent"])
+            usage_result = record_agent_run(first_step["agent"])
+            if usage_result.get("_promoted"):
+                publish_event("agent.promoted", {"agent_id": first_step["agent"], "lifecycle": "persistent"}, sid)
             _route_to_agent(first_step["agent"], target_agent, text, sid)
             complete_quest(quest["id"], f"Step 1/{len(pipeline['steps'])} complete")
         return
@@ -1142,10 +1168,16 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     if delegated_agent == agent_id and skill:
         agent_name = agent.get("name", agent_id.title())
         _emit_agent_reply(agent_id, agent, f"{agent_name} is on it...\n\n" + chr(9203) + " Running skill...", sid)
-        record_agent_run(agent_id)
+        usage_result = record_agent_run(agent_id)
+        publish_event("run.completed", {"agent_id": agent_id})
+        if usage_result.get("_promoted"):
+            publish_event("agent.promoted", {"agent_id": agent_id, "lifecycle": "persistent"}, sid)
         quest = create_quest(text[:80], agent_id)
+        publish_event("quest.created", {"quest_id": quest["id"], "agent_id": agent_id, "title": text[:80]}, sid)
         _run_skill_interactive(agent_id, agent, skill, text, sid)
         complete_quest(quest["id"], "Completed")
+        publish_event("quest.completed", {"quest_id": quest["id"], "agent_id": agent_id}, sid)
+        publish_event("lab.stats", {})
         return
 
     # Check for multi-agent pipeline first
@@ -1159,7 +1191,9 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         target_agent = AGENTS.get(first_step["agent"])
         if target_agent:
             quest = create_quest(f"[Pipeline: {pipeline['name']}] {text[:60]}", first_step["agent"])
-            record_agent_run(first_step["agent"])
+            usage_result = record_agent_run(first_step["agent"])
+            if usage_result.get("_promoted"):
+                publish_event("agent.promoted", {"agent_id": first_step["agent"], "lifecycle": "persistent"}, sid)
             _route_to_agent(first_step["agent"], target_agent, text, sid)
             complete_quest(quest["id"], f"Step 1/{len(pipeline['steps'])} complete")
         return
@@ -1178,10 +1212,16 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     if delegated_agent == agent_id and skill:
         agent_name = agent.get("name", agent_id.title())
         _emit_agent_reply(agent_id, agent, f"{agent_name} is on it...\n\n" + chr(9203) + " Running skill...", sid)
-        record_agent_run(agent_id)
+        usage_result = record_agent_run(agent_id)
+        publish_event("run.completed", {"agent_id": agent_id})
+        if usage_result.get("_promoted"):
+            publish_event("agent.promoted", {"agent_id": agent_id, "lifecycle": "persistent"}, sid)
         quest = create_quest(text[:80], agent_id)
+        publish_event("quest.created", {"quest_id": quest["id"], "agent_id": agent_id, "title": text[:80]}, sid)
         _run_skill_interactive(agent_id, agent, skill, text, sid)
         complete_quest(quest["id"], "Completed")
+        publish_event("quest.completed", {"quest_id": quest["id"], "agent_id": agent_id}, sid)
+        publish_event("lab.stats", {})
         return
 
     # Call LLM

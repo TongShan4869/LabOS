@@ -129,6 +129,7 @@ def record_agent_run(agent_id: str, tokens_in: int = 0, tokens_out: int = 0):
     usage_file.write_text(json.dumps(usage, indent=2))
     
     # Check for auto-promotion
+    promoted = False
     config = get_agent_config(agent_id)
     if config["lifecycle"] == "ephemeral" and usage["runs"] >= config["promotion_threshold"]:
         update_agent_config(agent_id, {
@@ -136,7 +137,9 @@ def record_agent_run(agent_id: str, tokens_in: int = 0, tokens_out: int = 0):
             "status": "active",
         })
         audit_log("promotion", agent_id, f"Auto-promoted to persistent after {usage['runs']} runs")
+        promoted = True
     
+    usage["_promoted"] = promoted
     return usage
 
 
