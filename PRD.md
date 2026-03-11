@@ -645,3 +645,4 @@ User's current level and XP shown in the office UI header. Level-up triggers a v
 *Next step: draft `lab-init` SKILL.md — the foundation everything else builds on.*
 
 | 2026-03-10 | 2.0 | Lab Manager v2: single entry point, auto-delegation, quest board, agent lifecycle, multi-agent pipelines, night shift, audit log, LifeOS vision |
+| 2026-03-11 | 2.1 | Live event system (Paperclip-inspired), unified 3-column dashboard (quests+shifts / team / projects+reports), Lab Manager rename, specialist sprite interactivity (idle=scenery, working=interactive), /api/reports endpoint, real-time dashboard updates |

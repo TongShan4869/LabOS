@@ -135,14 +135,16 @@ Just talk to any agent — the Lab Manager routes it:
 
 ## 7. Key Features
 
-### 📋 Quest Board
-Click 📋 to see:
-- **Active quests** — tasks being worked on
-- **Completed quests** — history with XP earned
-- **Team Roster** — agent stats, lifecycle badges, usage
-- **Night Shift** — scheduled recurring agent work
+### 📊 Dashboard
+Click 📊 to open the three-column dashboard below the lab scene:
+- **Left column** — Quests (active + completed) / Night Shift schedules
+- **Center column** — Team Roster with agent lifecycle and usage stats
+- **Right column** — Projects / Reports (switchable tabs)
 
-### 📂 Filing Cabinet
+The dashboard updates in real-time via live events — when an agent finishes work, you see the results instantly.
+
+### 📂 Filing Cabinet (Legacy)
+Filing cabinet features are now integrated into the Dashboard. Use the Projects and Reports tabs.
 Click the 📂 button (top-right) to browse:
 - **Projects** — create and switch between research projects
 - **Reports** — all generated reports with titles and timestamps
@@ -164,10 +166,16 @@ Level up from *Confused First-Year* all the way to *The Omniscient and Omnipoten
 Click the XP bar (top-left) to see your progress and level history.
 
 ### 📋 Reports
-Long agent responses automatically become reports — viewable in a slide-in panel with full Markdown rendering (headings, tables, code blocks, links).
+Long agent responses automatically become reports — viewable in a slide-in panel with full Markdown rendering. Browse all reports in Dashboard → 📄 Reports tab.
 
 ### ✅ Checkpoints
 For expensive operations (like searching hundreds of papers), agents ask for confirmation before proceeding. You stay in control.
+
+### 📡 Live Events
+The UI updates in real-time:
+- 📋 Toast notification when quests are created/completed
+- 🎉 Notification when an agent gets promoted
+- 🪙 Coins counter updates instantly after agent runs
 
 ---
 
