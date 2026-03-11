@@ -1229,10 +1229,12 @@ function activateProject(projectId) {
 }
 
 function showNewProjectModal() {
-  document.getElementById('new-project-modal')?.classList.remove('hidden');
+  const modal = document.getElementById('new-project-modal');
+  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
 }
 function closeNewProjectModal() {
-  document.getElementById('new-project-modal')?.classList.add('hidden');
+  const modal = document.getElementById('new-project-modal');
+  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
 }
 
 function createNewProject() {
@@ -1254,7 +1256,7 @@ function createNewProject() {
       document.getElementById('new-project-field').value = '';
       document.getElementById('new-project-desc').value = '';
       showToast(`Project "${name}" created!`);
-      loadProjects();
+      dashLoadRightTab("projects");
     })
     .catch(err => console.error('createNewProject error:', err));
 }
