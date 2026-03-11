@@ -673,7 +673,8 @@ function connectSocket() {
         updateCoins();
         const panel = document.getElementById("dashboard-panel");
         if (panel && !panel.classList.contains("hidden")) {
-          dashLoadQuests(document.getElementById("dash-quests"));
+          const activeLeft = document.querySelector(".dash-left-tab.active");
+          if (activeLeft?.dataset.tab === "quests") dashLoadQuests(document.getElementById("dash-left"));
         }
         const p = event.payload;
         if (p.agent_id && p.title) {
@@ -684,7 +685,8 @@ function connectSocket() {
         updateCoins();
         const panel = document.getElementById("dashboard-panel");
         if (panel && !panel.classList.contains("hidden")) {
-          dashLoadQuests(document.getElementById("dash-quests"));
+          const activeLeft = document.querySelector(".dash-left-tab.active");
+          if (activeLeft?.dataset.tab === "quests") dashLoadQuests(document.getElementById("dash-left"));
         }
         showToast("✅ Quest completed!");
       },
@@ -1183,10 +1185,6 @@ function showFilingCabinet() {
   const btn = document.getElementById("hud-dashboard");
   if (panel) { panel.classList.remove("hidden"); btn?.classList.add("active"); }
   dashRefreshAll();
-  document.querySelectorAll(".dash-right-tab").forEach(t => t.classList.remove("active"));
-  const projTab = document.querySelector('.dash-right-tab[data-tab="projects"]');
-  if (projTab) projTab.classList.add("active");
-  dashLoadRightTab("projects");
 }
 
 function closeFilingCabinet() { /* no-op — dashboard handles this */ }
@@ -1461,7 +1459,16 @@ document.getElementById("hud-dashboard")?.addEventListener("click", () => {
   }
 });
 
-// Right column tab switching
+// Left column tab switching (quests / shifts)
+document.querySelectorAll(".dash-left-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".dash-left-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    dashLoadLeftTab(tab.dataset.tab);
+  });
+});
+
+// Right column tab switching (projects / reports)
 document.querySelectorAll(".dash-right-tab").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".dash-right-tab").forEach(t => t.classList.remove("active"));
@@ -1471,10 +1478,23 @@ document.querySelectorAll(".dash-right-tab").forEach(tab => {
 });
 
 function dashRefreshAll() {
-  dashLoadQuests(document.getElementById("dash-quests"));
+  const activeLeft = document.querySelector(".dash-left-tab.active");
+  dashLoadLeftTab(activeLeft?.dataset.tab || "quests");
   dashLoadRoster(document.getElementById("dash-roster"));
   const activeRight = document.querySelector(".dash-right-tab.active");
   dashLoadRightTab(activeRight?.dataset.tab || "projects");
+}
+
+async function dashLoadLeftTab(tabName) {
+  const content = document.getElementById("dash-left");
+  if (!content) return;
+  content.innerHTML = '<div class="dash-loading">Loading...</div>';
+  try {
+    if (tabName === "schedules") return await dashLoadSchedules(content);
+    return await dashLoadQuests(content);
+  } catch (e) {
+    content.innerHTML = '<div class="dash-loading">Failed to load.</div>';
+  }
 }
 
 async function dashLoadRightTab(tabName) {
@@ -1485,8 +1505,6 @@ async function dashLoadRightTab(tabName) {
     switch (tabName) {
       case "projects": return await dashLoadProjects(content);
       case "reports": return await dashLoadReports(content);
-      case "memory": return await dashLoadMemory(content);
-      case "schedules": return await dashLoadSchedules(content);
     }
   } catch (e) {
     content.innerHTML = `<div class="dash-loading">Failed to load.</div>`;
@@ -1587,42 +1605,6 @@ async function dashLoadReports(content) {
       </div>
     </div>
   `).join("");
-}
-
-async function dashLoadMemory(content) {
-  const agents = ["main", "scout", "stat", "quill", "sage", "critic", "trend", "warden"];
-  
-  let html = '<div style="margin-bottom:12px"><label style="color:#aaa;font-size:12px">Agent: </label>';
-  html += `<select id="dash-memory-agent" onchange="dashRefreshMemory()" style="background:#1e1e3a;color:#fff;border:1px solid #3a3a5c;padding:4px 8px;border-radius:4px">`;
-  html += agents.map(a => `<option value="${a}">${a}</option>`).join("");
-  html += '</select></div>';
-  html += '<div id="dash-memory-content"></div>';
-  content.innerHTML = html;
-  dashRefreshMemory();
-}
-
-async function dashRefreshMemory() {
-  const agent = document.getElementById("dash-memory-agent")?.value || "main";
-  const el = document.getElementById("dash-memory-content");
-  if (!el) return;
-  
-  try {
-    const res = await fetch(origin + `/api/agents/${agent}/memory`);
-    const data = await res.json();
-    const entries = data.memory || [];
-    if (!entries.length) {
-      el.innerHTML = '<div class="dash-loading">No memory recorded yet.</div>';
-      return;
-    }
-    el.innerHTML = entries.map(e => `
-      <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:13px">
-        <span style="color:#ccc">${e.text}</span>
-        <span style="color:#555;font-size:11px;float:right">${new Date(e.timestamp).toLocaleDateString()}</span>
-      </div>
-    `).join("");
-  } catch {
-    el.innerHTML = '<div class="dash-loading">Could not load memory.</div>';
-  }
 }
 
 async function dashLoadSchedules(content) {

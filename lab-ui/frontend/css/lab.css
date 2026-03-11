@@ -1856,6 +1856,7 @@ body {
   flex-shrink: 0;
 }
 
+.dash-left-tab,
 .dash-right-tab {
   flex: 1;
   background: transparent;
@@ -1869,11 +1870,13 @@ body {
   text-align: center;
 }
 
+.dash-left-tab:hover,
 .dash-right-tab:hover {
   color: #ccc;
   background: #1a1a3a;
 }
 
+.dash-left-tab.active,
 .dash-right-tab.active {
   color: #fff;
   border-bottom-color: #6a6aff;

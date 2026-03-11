@@ -100,8 +100,11 @@
   <div id="dashboard-panel" class="hidden">
     <div id="dashboard-columns">
       <div class="dash-col">
-        <div class="dash-col-header">📋 Quests</div>
-        <div class="dash-col-content" id="dash-quests"></div>
+        <div class="dash-col-header-tabs">
+          <button class="dash-left-tab active" data-tab="quests">📋 Quests</button>
+          <button class="dash-left-tab" data-tab="schedules">🌙 Shifts</button>
+        </div>
+        <div class="dash-col-content" id="dash-left"></div>
       </div>
       <div class="dash-col">
         <div class="dash-col-header">🤖 Team</div>
@@ -111,8 +114,6 @@
         <div class="dash-col-header-tabs">
           <button class="dash-right-tab active" data-tab="projects">📁 Projects</button>
           <button class="dash-right-tab" data-tab="reports">📄 Reports</button>
-          <button class="dash-right-tab" data-tab="memory">🧠 Memory</button>
-          <button class="dash-right-tab" data-tab="schedules">🌙 Shifts</button>
         </div>
         <div class="dash-col-content" id="dash-right"></div>
       </div>
