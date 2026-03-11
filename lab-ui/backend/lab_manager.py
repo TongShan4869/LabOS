@@ -408,11 +408,11 @@ def detect_pipeline(text: str) -> str | None:
     text_lower = text.lower()
     
     # Lit review pipeline triggers
-    if re.search(r"(full|comprehensive|systematic)\\s*(lit|literature)\s*(review|search|survey)", text_lower):
+    if re.search(r"(full|comprehensive|systematic)\s*(lit|literature)\s*(review|search|survey)", text_lower):
         return "lit_review"
     
     # Study design pipeline triggers
-    if re.search(r"(design|plan)\\s*(a|my|the)?\s*(study|experiment|trial)", text_lower):
+    if re.search(r"(design|plan)\s*(a|my|the)?\s*(study|experiment|trial)", text_lower):
         return "study_design"
     
     return None

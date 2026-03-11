@@ -252,7 +252,7 @@ function _typewritePage(text, onDone) {
     } else {
       // Render markdown after typewriter finishes
       if (typeof marked !== 'undefined') {
-        dlgText.innerHTML = marked.parse(text);
+        dlgText.innerHTML = DOMPurify.sanitize(marked.parse(text));
       }
       state.isTyping = false;
       if (onDone) onDone();
@@ -848,7 +848,7 @@ function closeReportPanel() {
 function formatReport(text) {
   // Render markdown if marked.js is available
   if (typeof marked !== 'undefined') {
-    return marked.parse(text);
+    return DOMPurify.sanitize(marked.parse(text));
   }
   // Fallback: basic formatting
   return text
@@ -1646,7 +1646,7 @@ function openReportById(filename) {
         const rp = document.getElementById("report-panel");
         const rb = document.getElementById("report-body");
         if (rp && rb) {
-          rb.innerHTML = marked.parse(report.text);
+          rb.innerHTML = DOMPurify.sanitize(marked.parse(report.text));
           rp.classList.remove("hidden");
         }
       }

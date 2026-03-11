@@ -17,8 +17,38 @@ import time
 from datetime import datetime
 from pathlib import Path
 import uuid
+import logging
+import fcntl
 
 from flask import Flask, jsonify, send_from_directory, request
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s %(asctime)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("labos")
+
+
+# ─── Security helpers ─────────────────────────────────────────────────────────
+
+def _safe_path_component(value: str) -> str:
+    """Sanitize a path component (project_id, agent_id, filename).
+    Raises ValueError if it contains path traversal characters."""
+    if not value or ".." in value or "/" in value or "\\" in value or "\x00" in value:
+        raise ValueError(f"Invalid path component: {value!r}")
+    return value
+
+
+def _safe_resolve(base: Path, *parts: str) -> Path:
+    """Resolve a path and ensure it stays within the base directory."""
+    for p in parts:
+        _safe_path_component(p)
+    resolved = (base / Path(*parts)).resolve()
+    if not str(resolved).startswith(str(base.resolve())):
+        raise ValueError(f"Path escapes base directory: {resolved}")
+    return resolved
 from flask_socketio import SocketIO, emit
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
@@ -75,63 +105,6 @@ ACTIVE_PROJECT_FILE = DATA_DIR / "active_project.txt"
 
 
 
-# ─── Agent System Prompts ─────────────────────────────────────────────────────
-
-AGENT_PROMPTS = {
-    "scout": """You are Scout, the Literature Search specialist in a research lab called LabOS.
-You help researchers find, filter, and analyze scientific papers.
-
-When the user asks you to search for papers, you should run the literature search skill.
-When they ask about previous results, reference the conversation history — do NOT search again.
-When they say "summarize the top 5" or similar, work with existing results from the conversation.
-
-Be concise, use numbered lists for papers. You're a fellow researcher, not a search engine.
-Always explain what you found and why it's relevant.""",
-
-    "stat": """You are Stat, the Biostatistician in LabOS.
-You help with statistical analysis, study design, power calculations, and methods review.
-
-Ask clarifying questions before running complex analyses.
-Explain statistical concepts in accessible terms.
-When the user references previous analyses, use conversation history.""",
-
-    "quill": """You are Quill, the Writing Assistant in LabOS.
-You help draft, edit, and polish research papers, grants, and scientific writing.
-
-Focus on clarity, structure, and scientific rigor.
-When editing, explain your changes. When drafting, follow academic conventions.
-Ask which section and what style/journal format they need.""",
-
-    "sage": """You are Sage, the Research Advisor in LabOS.
-You provide strategic research guidance — hypothesis refinement, methodology, career advice.
-
-Think deeply before responding. Ask probing questions.
-Challenge assumptions constructively. Help identify gaps and opportunities.
-You're a senior mentor, not just an information source.""",
-
-    "critic": """You are Critic, the Peer Reviewer in LabOS.
-You review drafts and provide tough but constructive feedback.
-
-Be specific about weaknesses. Suggest concrete improvements.
-Check methodology, statistical claims, logical flow, and citation gaps.
-You're preparing them for real peer review — be honest but helpful.""",
-
-    "trend": """You are Trend, the Field Monitor in LabOS.
-You track emerging trends, new papers, and developments in the researcher's fields.
-
-Provide concise digests. Highlight what's genuinely new vs incremental.
-Connect trends to the researcher's ongoing projects when relevant.""",
-
-    "warden": """You are Warden, the Security & Compliance agent in LabOS.
-You handle data security, IRB compliance, and research integrity.
-
-Be thorough but not paranoid. Focus on actionable recommendations.
-Check for common issues: data handling, consent, conflicts of interest.""",
-
-    "main": """You are the Principal Investigator (PI) of this research lab.
-You coordinate the team, set priorities, and make strategic decisions.
-Help the researcher think about their overall research program.""",
-}
 
 # Python binary — use the venv if available
 PYTHON_BIN   = os.environ.get("LABOS_PYTHON", sys.executable)
@@ -141,10 +114,10 @@ PYTHON_BIN   = os.environ.get("LABOS_PYTHON", sys.executable)
 AGENTS = {
     "main": {
         "id":       "main",
-        "name":     "醋の虾",
-        "role":     "Lab Coordinator",
+        "name":     "Lab Manager",
+        "role":     "Lab Orchestrator",
         "skill":    None,
-        "emoji":    "🦞",
+        "emoji":    "🧑‍🔬",
         "zone":     "pi-desk",
         "color":    "#e63946",
         "avatar":   "avatar-main.png",
@@ -465,7 +438,7 @@ def _ensure_data_structure():
             if projects:
                 _set_active_project(list(PROJECTS_DIR.iterdir())[0].name)
         except Exception as e:
-            print(f"Warning: Could not migrate projects: {e}")
+            log.warning(f"Could not migrate projects: {e}")
     
     # Initialize active project if not set
     if not ACTIVE_PROJECT_FILE.exists():
@@ -662,8 +635,11 @@ _ensure_data_structure()
 # ─── App setup ────────────────────────────────────────────────────────────────
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
-app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", "labos-dev-secret")
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", os.urandom(32).hex())
+# CORS: allow localhost + tunnel URLs; override with LABOS_CORS_ORIGINS env var
+_cors_origins = os.environ.get("LABOS_CORS_ORIGINS", "")
+_allowed_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins else ["http://127.0.0.1:*", "http://localhost:*", "https://*.trycloudflare.com"]
+socketio = SocketIO(app, cors_allowed_origins=_allowed_origins, async_mode="threading")
 
 # Active agent conversations: {agent_id: {"process": Popen, ...}}
 active_convos: dict = {}
@@ -725,26 +701,29 @@ def _calc_level(xp: int) -> tuple:
         cumulative += needed
         level += 1
 
+_xp_lock = threading.Lock()
+
 def _award_xp_backend(amount: int, event: str, badge: str = None):
-    """Award XP from the backend (for agent interactions)."""
-    try:
-        data = json.loads(XP_FILE.read_text()) if XP_FILE.exists() else {"xp": 0, "badges": [], "history": []}
-        data["xp"] = data.get("xp", 0) + amount
-        if badge and badge not in data.get("badges", []):
-            data.setdefault("badges", []).append(badge)
-        data.setdefault("history", []).append({
-            "event": event,
-            "xp": amount,
-            "timestamp": datetime.now().isoformat()
-        })
-        # Recalculate level
-        level, title, xp_next, _ = _calc_level(data["xp"])
-        data["level"] = level
-        data["level_title"] = title
-        data["xp_to_next"] = xp_next
-        XP_FILE.write_text(json.dumps(data, indent=2))
-    except Exception as e:
-        print(f"[XP] Error: {e}")
+    """Award XP from the backend (for agent interactions). Thread-safe."""
+    with _xp_lock:
+        try:
+            data = json.loads(XP_FILE.read_text()) if XP_FILE.exists() else {"xp": 0, "badges": [], "history": []}
+            data["xp"] = data.get("xp", 0) + amount
+            if badge and badge not in data.get("badges", []):
+                data.setdefault("badges", []).append(badge)
+            data.setdefault("history", []).append({
+                "event": event,
+                "xp": amount,
+                "timestamp": datetime.now().isoformat()
+            })
+            # Recalculate level
+            level, title, xp_next, _ = _calc_level(data["xp"])
+            data["level"] = level
+            data["level_title"] = title
+            data["xp_to_next"] = xp_next
+            XP_FILE.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            log.error(f"XP award failed: {e}")
 
 
 def load_xp() -> dict:
@@ -813,6 +792,10 @@ def api_agents():
 
 @app.route("/api/history/<agent_id>")
 def api_history(agent_id):
+    try:
+        _safe_path_component(agent_id)
+    except ValueError:
+        return jsonify({"error": "Invalid agent_id"}), 400
     return jsonify(message_history.get(agent_id, []))
 
 
@@ -864,6 +847,10 @@ def api_projects_create():
 @app.route("/api/projects/<project_id>/activate", methods=["PUT"])
 def api_projects_activate(project_id):
     """Set the active project."""
+    try:
+        _safe_path_component(project_id)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid project_id"}), 400
     proj_dir = PROJECTS_DIR / project_id
     if not proj_dir.exists():
         return jsonify({"ok": False, "error": "Project not found"}), 404
@@ -881,6 +868,10 @@ def api_projects_activate(project_id):
 @app.route("/api/projects/<project_id>/reports", methods=["GET"])
 def api_projects_reports(project_id):
     """Get all reports for a project."""
+    try:
+        _safe_path_component(project_id)
+    except ValueError:
+        return jsonify({"error": "Invalid project_id"}), 400
     reports = _load_reports(project_id)
     return jsonify({"reports": reports})
 
@@ -915,6 +906,10 @@ def api_reports():
 @app.route("/api/report/<filename>", methods=["GET"])
 def api_report_detail(filename):
     """Get a single report by filename."""
+    try:
+        _safe_path_component(filename)
+    except ValueError:
+        return jsonify({"error": "Invalid filename"}), 400
     project_id = _get_active_project_id()
     if not project_id:
         return jsonify({"error": "No active project"}), 404
@@ -931,6 +926,11 @@ def api_report_detail(filename):
 @app.route("/api/projects/<project_id>/chats/<agent_id>", methods=["GET"])
 def api_projects_chats(project_id, agent_id):
     """Get chat history for an agent in a project."""
+    try:
+        _safe_path_component(project_id)
+        _safe_path_component(agent_id)
+    except ValueError:
+        return jsonify({"error": "Invalid parameters"}), 400
     history = _load_chat_history(project_id, agent_id)
     return jsonify({"messages": history})
 
@@ -938,6 +938,10 @@ def api_projects_chats(project_id, agent_id):
 @app.route("/api/agents/<agent_id>/memory", methods=["GET"])
 def api_agents_memory_get(agent_id):
     """Get agent memory."""
+    try:
+        _safe_path_component(agent_id)
+    except ValueError:
+        return jsonify({"error": "Invalid agent_id"}), 400
     mem_file = AGENTS_MEM_DIR / agent_id / "memory.json"
     memory = _load_memory(mem_file)
     return jsonify({"memory": memory})
@@ -946,6 +950,10 @@ def api_agents_memory_get(agent_id):
 @app.route("/api/agents/<agent_id>/memory", methods=["POST"])
 def api_agents_memory_add(agent_id):
     """Add entry to agent memory."""
+    try:
+        _safe_path_component(agent_id)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid agent_id"}), 400
     data = request.json or {}
     text = data.get("text", "").strip()
     if not text:
@@ -965,6 +973,10 @@ def api_agents_memory_add(agent_id):
 @app.route("/api/projects/<project_id>/memory", methods=["GET"])
 def api_projects_memory_get(project_id):
     """Get project memory."""
+    try:
+        _safe_path_component(project_id)
+    except ValueError:
+        return jsonify({"error": "Invalid project_id"}), 400
     mem_file = PROJECTS_DIR / project_id / "memory.json"
     memory = _load_memory(mem_file)
     return jsonify({"memory": memory})
@@ -973,6 +985,10 @@ def api_projects_memory_get(project_id):
 @app.route("/api/projects/<project_id>/memory", methods=["POST"])
 def api_projects_memory_add(project_id):
     """Add entry to project memory."""
+    try:
+        _safe_path_component(project_id)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid project_id"}), 400
     data = request.json or {}
     text = data.get("text", "").strip()
     if not text:
@@ -1072,6 +1088,13 @@ def on_connect():
     emit("lab_status", get_lab_status())
 
 
+@socketio.on("disconnect")
+def on_disconnect():
+    """Clean up active conversations when a client disconnects."""
+    sid = request.sid
+    log.info(f"Client disconnected: {sid}")
+
+
 @socketio.on("send_message")
 def on_message(data):
     agent_id = data.get("agent_id", "main")
@@ -1108,7 +1131,7 @@ def on_message(data):
 
 def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
     """Intelligent agent loop — LLM decides whether to chat or run a skill."""
-    print(f"[AGENT] route_to_agent called: {agent_id} / {text[:50]}", flush=True)
+    log.info(f"[AGENT] route_to_agent called: {agent_id} / {text[:50]}")
     skill = agent.get("skill")
     
     # Build context: system prompt + memory + conversation history
@@ -1172,8 +1195,7 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     # For scout: if user clearly wants a search, skip LLM and go straight to skill
         # For scout: if user clearly wants a search, skip LLM and go straight to skill
     if agent_id == "scout" and skill:
-        import re as _re
-        search_patterns = _re.compile(r"(search|find|look for|look up|get|fetch|discover)\\b.*(paper|article|literature|publication|study|studies)", _re.I)
+        search_patterns = re.compile(r"(search|find|look for|look up|get|fetch|discover)\b.*(paper|article|literature|publication|study|studies)", re.I)
         if search_patterns.search(text):
             msg = "Searching for papers... \U0001f50d\n\n\u23f3 Running skill..."
             _emit_agent_reply(agent_id, agent, msg, sid)
@@ -1184,7 +1206,7 @@ When asked "what can you do?", explain your role and capabilities in plain text.
     pipeline_id = detect_pipeline(text)
     if pipeline_id and pipeline_id in PIPELINES:
         pipeline = PIPELINES[pipeline_id]
-        print(f"[LAB_MANAGER] Pipeline detected: {pipeline['name']}", flush=True)
+        log.info(f"[LAB_MANAGER] Pipeline detected: {pipeline['name']}")
         _emit_agent_reply(agent_id, agent, f"Starting **{pipeline['name']}** pipeline...\n\n" + "\n".join(f"{i+1}. {s['agent'].title()}: {s['description']}" for i, s in enumerate(pipeline['steps'])), sid)
         # Run first step (subsequent steps need manual trigger for now)
         first_step = pipeline["steps"][0]
@@ -1204,51 +1226,7 @@ When asked "what can you do?", explain your role and capabilities in plain text.
         # Re-route to the correct specialist
         target_agent = AGENTS.get(delegated_agent)
         if target_agent:
-            print(f"[LAB_MANAGER] Delegating to {delegated_agent}: {text[:50]}", flush=True)
-            _route_to_agent(delegated_agent, target_agent, text, sid)
-            return
-    
-    # Direct skill execution when intent matches the current agent
-    if delegated_agent == agent_id and skill:
-        agent_name = agent.get("name", agent_id.title())
-        _emit_agent_reply(agent_id, agent, f"{agent_name} is on it...\n\n" + chr(9203) + " Running skill...", sid)
-        usage_result = record_agent_run(agent_id)
-        publish_event("run.completed", {"agent_id": agent_id})
-        if usage_result.get("_promoted"):
-            publish_event("agent.promoted", {"agent_id": agent_id, "lifecycle": "persistent"}, sid)
-        quest = create_quest(text[:80], agent_id)
-        publish_event("quest.created", {"quest_id": quest["id"], "agent_id": agent_id, "title": text[:80]}, sid)
-        _run_skill_interactive(agent_id, agent, skill, text, sid)
-        complete_quest(quest["id"], "Completed")
-        publish_event("quest.completed", {"quest_id": quest["id"], "agent_id": agent_id}, sid)
-        publish_event("lab.stats", {})
-        return
-
-    # Check for multi-agent pipeline first
-    pipeline_id = detect_pipeline(text)
-    if pipeline_id and pipeline_id in PIPELINES:
-        pipeline = PIPELINES[pipeline_id]
-        print(f"[LAB_MANAGER] Pipeline detected: {pipeline['name']}", flush=True)
-        _emit_agent_reply(agent_id, agent, f"Starting **{pipeline['name']}** pipeline...\n\n" + "\n".join(f"{i+1}. {s['agent'].title()}: {s['description']}" for i, s in enumerate(pipeline['steps'])), sid)
-        # Run first step (subsequent steps need manual trigger for now)
-        first_step = pipeline["steps"][0]
-        target_agent = AGENTS.get(first_step["agent"])
-        if target_agent:
-            quest = create_quest(f"[Pipeline: {pipeline['name']}] {text[:60]}", first_step["agent"])
-            usage_result = record_agent_run(first_step["agent"])
-            if usage_result.get("_promoted"):
-                publish_event("agent.promoted", {"agent_id": first_step["agent"], "lifecycle": "persistent"}, sid)
-            _route_to_agent(first_step["agent"], target_agent, text, sid)
-            complete_quest(quest["id"], f"Step 1/{len(pipeline['steps'])} complete")
-        return
-
-    # Lab Manager delegation: detect task intent and route to specialist
-    delegated_agent = detect_delegation(text)
-    if delegated_agent and delegated_agent != agent_id:
-        # Re-route to the correct specialist
-        target_agent = AGENTS.get(delegated_agent)
-        if target_agent:
-            print(f"[LAB_MANAGER] Delegating to {delegated_agent}: {text[:50]}", flush=True)
+            log.info(f"[LAB_MANAGER] Delegating to {delegated_agent}: {text[:50]}")
             _route_to_agent(delegated_agent, target_agent, text, sid)
             return
     
@@ -1270,13 +1248,12 @@ When asked "what can you do?", explain your role and capabilities in plain text.
 
     # Call LLM
     response = _run_llm(messages)
-    print(f"[LLM_FULL] {repr(response[:500])}", flush=True)
+    log.info(f"[LLM_FULL] {repr(response[:500])}")
     
     # Check if agent wants to run a skill
     has_tool_call = "[RUN_SKILL]" in response or "[TOOL_CALL]" in response
     if has_tool_call and skill:
         # Agent decided to use its skill — determine which one
-        import re
         
         # For agents with multiple skills, detect which tool was called
         active_skill = skill
@@ -1287,7 +1264,7 @@ When asked "what can you do?", explain your role and capabilities in plain text.
                 skill_map = {"draft": "lab-writing-assistant", "publish": "lab-publishing-assistant",
                              "search": "lab-lit-scout", "advise": "lab-research-advisor"}
                 active_skill = skill_map.get(tool_name, skill)
-                print(f"[AGENT] Multi-skill agent: tool={tool_name} → {active_skill}", flush=True)
+                log.info(f"[AGENT] Multi-skill agent: tool={tool_name} → {active_skill}")
         
         # Strip tool call markers and JSON
         clean_response = re.sub(r'\[/?TOOL_CALL\].*?(?=\[/TOOL_CALL\]|$)', '', response, flags=re.DOTALL)
@@ -1355,9 +1332,9 @@ Examples of good memory entries:
                 lab_mem_file = REPO_DIR / "LAB_MEMORY.md"
                 _append_memory_md(lab_mem_file, f"[{agent_name}] {result}")
             
-            print(f"[MEMORY] {agent_name} saved: {result[:80]}", flush=True)
+            log.info(f"[MEMORY] {agent_name} saved: {result[:80]}")
     except Exception as e:
-        print(f"[MEMORY] extraction failed: {e}", flush=True)
+        log.info(f"[MEMORY] extraction failed: {e}")
 
 # ─── Skill argument extraction ────────────────────────────────────────────────
 
@@ -1514,7 +1491,6 @@ def _translate_checkpoint_reply(user_text: str, checkpoint_prompt: str) -> str:
     if lower in ("all", "done", "yes", "no", "y", "n"):
         return user_text
     # If it's already just numbers/commas, pass through
-    import re
     if re.match(r"^[\d,\s]+$", lower):
         return user_text
     
@@ -1665,7 +1641,7 @@ def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, si
             active_proj = _get_active_project_id()
             if active_proj and len(final_text) > 200:
                 _save_report(active_proj, agent_id, agent["name"], final_text)
-                print(f"[REPORT] Saved report for {agent_id} ({len(final_text)} chars)")
+                log.info(f"[REPORT] Saved report for {agent_id} ({len(final_text)} chars)")
                 # Award XP for skill completion
                 _award_xp_backend(50, f"Skill run: {skill}", f"🔬 Literature Dive")
 
@@ -1748,37 +1724,6 @@ def _auto_extract_memory(agent_id: str, text: str):
         _save_memory(mem_file, memory)
 
 
-# ─── Main agent (PI) ─────────────────────────────────────────────────────────
-
-def _call_main_agent(agent_id: str, text: str) -> str:
-    """Call claude CLI as the main 醋の虾 agent."""
-    history = message_history.get(agent_id, [])[-6:]
-    history_text = "\n".join(
-        f"{'User' if m['role']=='user' else '醋の虾'}: {m['text']}"
-        for m in history[:-1]
-    )
-    
-    # Include memory context
-    memory_context = _get_combined_memory(agent_id)
-    
-    prompt = (
-        "You are 醋の虾 (Cu's Lobster), the PI of a virtual research lab running LabOS. "
-        "You are helpful, direct, and occasionally witty. "
-        "You can answer research questions, coordinate other lab agents, and advise on projects. "
-        "Keep responses concise (2-4 sentences max for dialogue).\n\n"
-    )
-    
-    if memory_context:
-        prompt += f"Context from memory:\n{memory_context}\n\n"
-    
-    if history_text:
-        prompt += f"Recent conversation:\n{history_text}\n\n"
-    
-    prompt += f"User: {text}\n醋の虾:"
-    
-    return _run_llm(prompt)
-
-
 def _load_llm_env():
     """Load LLM config from .env file."""
     if os.environ.get("LLM_API_KEY"):
@@ -1816,12 +1761,12 @@ def _run_llm(messages, max_tokens: int = 4096) -> str:
             )
             result = (resp.choices[0].message.content or "").strip()
             if not result:
-                print(f"[LLM] Gateway returned empty response", flush=True)
+                log.info(f"[LLM] Gateway returned empty response")
                 return "Hmm, I didn't have anything to say to that. Ask me something specific!"
-            print(f"[LLM] Gateway OK: {result[:80]}...", flush=True)
+            log.info(f"[LLM] Gateway OK: {result[:80]}...")
             return result
         except Exception as e:
-            print(f"[LLM] Gateway failed ({e}), falling back to direct API", flush=True)
+            log.info(f"[LLM] Gateway failed ({e}), falling back to direct API")
 
     # Fallback to direct API
     api_key = os.environ.get("LLM_API_KEY", "")
@@ -1879,7 +1824,7 @@ def push_state():
 
 def _broadcast_status():
     while True:
-        time.sleep(5)
+        time.sleep(30)
         socketio.emit("lab_status", get_lab_status())
 
 
@@ -1906,6 +1851,10 @@ def api_quests():
 @app.route("/api/agents/<agent_id>/usage", methods=["GET"])
 def api_agent_usage(agent_id):
     """Get agent usage stats."""
+    try:
+        _safe_path_component(agent_id)
+    except ValueError:
+        return jsonify({"error": "Invalid agent_id"}), 400
     return jsonify(get_agent_usage(agent_id))
 
 @app.route("/api/agents/roster", methods=["GET"])
@@ -1977,6 +1926,6 @@ def api_lab_summary():
 
 if __name__ == "__main__":
     port = int(os.environ.get("LABOS_UI_PORT", 18792))
-    print(f"🔬 LabOS UI running at http://127.0.0.1:{port}")
+    log.info(f"🔬 LabOS UI running at http://127.0.0.1:{port}")
     start_broadcast()
     socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)
