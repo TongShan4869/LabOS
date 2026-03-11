@@ -133,10 +133,9 @@ body {
 .agent-sprite.working:hover { transform: translateY(-50%) scale(1.06); cursor: pointer; }
 .agent-sprite.working:active { transform: translateY(-50%) scale(0.97); }
 
-/* Idle specialists: non-interactive */
+/* Idle specialists: non-interactive but fully visible */
 .agent-sprite:not([data-id="main"]):not(.working) {
   cursor: default;
-  opacity: 0.65;
 }
 .agent-sprite:not([data-id="main"]):not(.working):hover {
   transform: translateY(-50%);  /* no scale on hover */
