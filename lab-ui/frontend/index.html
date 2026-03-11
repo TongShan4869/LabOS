@@ -98,16 +98,24 @@
 
   <!-- ── Dashboard Panel (below lab scene) ──────── -->
   <div id="dashboard-panel" class="hidden">
-    <div id="dashboard-tabs">
-      <button class="dash-tab active" data-tab="quests">📋 Quests</button>
-      <button class="dash-tab" data-tab="roster">🤖 Team</button>
-      <button class="dash-tab" data-tab="projects">📁 Projects</button>
-      <button class="dash-tab" data-tab="reports">📄 Reports</button>
-      <button class="dash-tab" data-tab="memory">🧠 Memory</button>
-      <button class="dash-tab" data-tab="schedules">🌙 Night Shift</button>
-    </div>
-    <div id="dashboard-content">
-      <div class="dash-loading">Select a tab...</div>
+    <div id="dashboard-columns">
+      <div class="dash-col">
+        <div class="dash-col-header">📋 Quests</div>
+        <div class="dash-col-content" id="dash-quests"></div>
+      </div>
+      <div class="dash-col">
+        <div class="dash-col-header">🤖 Team</div>
+        <div class="dash-col-content" id="dash-roster"></div>
+      </div>
+      <div class="dash-col">
+        <div class="dash-col-header-tabs">
+          <button class="dash-right-tab active" data-tab="projects">📁 Projects</button>
+          <button class="dash-right-tab" data-tab="reports">📄 Reports</button>
+          <button class="dash-right-tab" data-tab="memory">🧠 Memory</button>
+          <button class="dash-right-tab" data-tab="schedules">🌙 Shifts</button>
+        </div>
+        <div class="dash-col-content" id="dash-right"></div>
+      </div>
     </div>
   </div>
 

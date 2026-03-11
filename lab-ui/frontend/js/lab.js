@@ -671,11 +671,9 @@ function connectSocket() {
     const handlers = {
       "quest.created": () => {
         updateCoins();
-        // If dashboard is open on quests tab, refresh
         const panel = document.getElementById("dashboard-panel");
         if (panel && !panel.classList.contains("hidden")) {
-          const activeTab = document.querySelector(".dash-tab.active");
-          if (activeTab?.dataset.tab === "quests") dashLoadTab("quests");
+          dashLoadQuests(document.getElementById("dash-quests"));
         }
         const p = event.payload;
         if (p.agent_id && p.title) {
@@ -686,8 +684,7 @@ function connectSocket() {
         updateCoins();
         const panel = document.getElementById("dashboard-panel");
         if (panel && !panel.classList.contains("hidden")) {
-          const activeTab = document.querySelector(".dash-tab.active");
-          if (activeTab?.dataset.tab === "quests") dashLoadTab("quests");
+          dashLoadQuests(document.getElementById("dash-quests"));
         }
         showToast("✅ Quest completed!");
       },
@@ -1181,14 +1178,15 @@ function initFilingCabinet() {
 }
 
 function showFilingCabinet() {
-  // Redirect to dashboard projects tab
+  // Redirect to dashboard with projects tab active in right column
   const panel = document.getElementById("dashboard-panel");
   const btn = document.getElementById("hud-dashboard");
   if (panel) { panel.classList.remove("hidden"); btn?.classList.add("active"); }
-  document.querySelectorAll(".dash-tab").forEach(t => t.classList.remove("active"));
-  const projTab = document.querySelector('.dash-tab[data-tab="projects"]');
+  dashRefreshAll();
+  document.querySelectorAll(".dash-right-tab").forEach(t => t.classList.remove("active"));
+  const projTab = document.querySelector('.dash-right-tab[data-tab="projects"]');
   if (projTab) projTab.classList.add("active");
-  dashLoadTab("projects");
+  dashLoadRightTab("projects");
 }
 
 function closeFilingCabinet() { /* no-op — dashboard handles this */ }
@@ -1456,38 +1454,42 @@ document.getElementById("hud-dashboard")?.addEventListener("click", () => {
   if (panel.classList.contains("hidden")) {
     panel.classList.remove("hidden");
     btn.classList.add("active");
-    // Load default tab
-    dashLoadTab("quests");
+    dashRefreshAll();
   } else {
     panel.classList.add("hidden");
     btn.classList.remove("active");
   }
 });
 
-document.querySelectorAll(".dash-tab").forEach(tab => {
+// Right column tab switching
+document.querySelectorAll(".dash-right-tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".dash-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".dash-right-tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
-    dashLoadTab(tab.dataset.tab);
+    dashLoadRightTab(tab.dataset.tab);
   });
 });
 
-async function dashLoadTab(tabName) {
-  const content = document.getElementById("dashboard-content");
-  content.innerHTML = '<div class="dash-loading">Loading...</div>';
+function dashRefreshAll() {
+  dashLoadQuests(document.getElementById("dash-quests"));
+  dashLoadRoster(document.getElementById("dash-roster"));
+  const activeRight = document.querySelector(".dash-right-tab.active");
+  dashLoadRightTab(activeRight?.dataset.tab || "projects");
+}
 
+async function dashLoadRightTab(tabName) {
+  const content = document.getElementById("dash-right");
+  if (!content) return;
+  content.innerHTML = '<div class="dash-loading">Loading...</div>';
   try {
     switch (tabName) {
-      case "quests": return await dashLoadQuests(content);
-      case "roster": return await dashLoadRoster(content);
       case "projects": return await dashLoadProjects(content);
       case "reports": return await dashLoadReports(content);
       case "memory": return await dashLoadMemory(content);
       case "schedules": return await dashLoadSchedules(content);
     }
   } catch (e) {
-    content.innerHTML = `<div class="dash-loading">Failed to load ${tabName}.</div>`;
-    console.error("Dashboard error:", e);
+    content.innerHTML = `<div class="dash-loading">Failed to load.</div>`;
   }
 }
 
