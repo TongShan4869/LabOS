@@ -1,26 +1,43 @@
 #!/usr/bin/env python3
 """
-LabOS UI Backend
-- Serves the pixel lab frontend
-- WebSocket bridge: routes messages between UI and LabOS agents
-- Spawns real skill scripts with checkpoint bridging
-- Reads LabOS state files for live agent status
+LabOS UI Backend — Entry Point
+
+Thin app setup: Flask + SocketIO init, blueprint registration, broadcast loop.
+All business logic lives in separate modules:
+  - config.py    — paths, constants, agent roster, prompts
+  - security.py  — path validation helpers
+  - llm.py       — LLM gateway/fallback calls
+  - xp.py        — XP & leveling system
+  - data.py      — project/memory/report/chat persistence
+  - agents.py    — agent routing, skill execution, checkpoints
+  - lab_manager.py — orchestration engine, quest board, scheduling
+  - routes/api.py — REST API endpoints (Blueprint)
 """
 
 import json
+import logging
 import os
-import re
-import subprocess
 import sys
 import threading
 import time
 from datetime import datetime
-from pathlib import Path
-import uuid
-import logging
-import fcntl
 
-from flask import Flask, jsonify, send_from_directory, request
+# Ensure backend dir is on path for local imports
+sys.path.insert(0, os.path.dirname(__file__))
+
+from flask import Flask, jsonify, request
+from flask_socketio import SocketIO, emit
+
+from config import (
+    AGENTS, FRONTEND_DIR, STATE_FILE, AGENTS_FILE, XP_FILE,
+    BROADCAST_INTERVAL,
+)
+from data import (
+    ensure_data_structure, get_active_project_id, load_project_meta,
+    load_chat_history, append_chat_message,
+)
+from xp import load_xp
+from agents import route_to_agent, handle_checkpoint_reply
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -30,59 +47,24 @@ logging.basicConfig(
 )
 log = logging.getLogger("labos")
 
+# ─── App setup ────────────────────────────────────────────────────────────────
 
-# ─── Security helpers ─────────────────────────────────────────────────────────
+app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
+app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", os.urandom(32).hex())
 
-def _safe_path_component(value: str) -> str:
-    """Sanitize a path component (project_id, agent_id, filename).
-    Raises ValueError if it contains path traversal characters."""
-    if not value or ".." in value or "/" in value or "\\" in value or "\x00" in value:
-        raise ValueError(f"Invalid path component: {value!r}")
-    return value
-
-
-def _safe_resolve(base: Path, *parts: str) -> Path:
-    """Resolve a path and ensure it stays within the base directory."""
-    for p in parts:
-        _safe_path_component(p)
-    resolved = (base / Path(*parts)).resolve()
-    if not str(resolved).startswith(str(base.resolve())):
-        raise ValueError(f"Path escapes base directory: {resolved}")
-    return resolved
-from flask_socketio import SocketIO, emit
-
-# ─── Paths ────────────────────────────────────────────────────────────────────
-
-ROOT_DIR     = Path(__file__).parent.parent
-FRONTEND_DIR = ROOT_DIR / "frontend"
-SKILLS_DIR   = ROOT_DIR.parent / "skills"
-LAB_DIR      = Path(os.environ.get("LAB_DIR", Path.home() / ".openclaw/workspace/lab"))
-REPO_DIR     = ROOT_DIR.parent  # LabOS repo root
-import sys as _sys
-_sys.path.insert(0, str(ROOT_DIR / "backend"))
-from lab_manager import (
-    add_schedule, remove_schedule, get_schedules, get_lab_summary,
-    detect_pipeline, PIPELINES,
-    detect_delegation, build_lab_manager_prompt, get_agent_config,
-    record_agent_run, create_quest, complete_quest, get_active_quests,
-    get_all_quests, audit_log, AGENT_REGISTRY, get_agent_usage
+# CORS: allow localhost + tunnel URLs; override with LABOS_CORS_ORIGINS env var
+_cors_origins = os.environ.get("LABOS_CORS_ORIGINS", "")
+_allowed_origins = (
+    [o.strip() for o in _cors_origins.split(",") if o.strip()]
+    if _cors_origins
+    else ["http://127.0.0.1:*", "http://localhost:*", "https://*.trycloudflare.com"]
 )
-STATE_FILE   = ROOT_DIR / "state.json"
+socketio = SocketIO(app, cors_allowed_origins=_allowed_origins, async_mode="threading")
 
-# ─── Live Event System (Paperclip-inspired) ──────────────────────────────────
-# Bidirectional: client sends chat via socket, server pushes events for state changes.
-# Frontend refetches from REST APIs on invalidation events instead of receiving full data.
+# ─── Live Event System ────────────────────────────────────────────────────────
 
 def publish_event(event_type: str, payload: dict = None, sid: str = None):
-    """Publish a live event to connected clients.
-    
-    Event types:
-      quest.created / quest.completed — invalidate quest board
-      agent.status                    — agent working/idle/error
-      agent.promoted / agent.archived — lifecycle change
-      lab.stats                       — invalidate coins, stats
-      run.started / run.completed     — invalidate agent usage
-    """
+    """Publish a live event to connected clients."""
     event = {
         "type": event_type,
         "payload": payload or {},
@@ -92,566 +74,30 @@ def publish_event(event_type: str, payload: dict = None, sid: str = None):
         socketio.emit("live_event", event, to=sid)
     else:
         socketio.emit("live_event", event)
-AGENTS_FILE  = ROOT_DIR / "agents-state.json"
-XP_FILE      = LAB_DIR / "xp.json"
-MEMORY_DIR   = Path.home() / ".openclaw/workspace/memory"
 
-# Filing Cabinet paths
-DATA_DIR            = ROOT_DIR.parent / "data"
-PROJECTS_DIR        = DATA_DIR / "projects"
-AGENTS_MEM_DIR      = DATA_DIR / "agents"
-SHARED_DIR          = DATA_DIR / "shared"
-ACTIVE_PROJECT_FILE = DATA_DIR / "active_project.txt"
+# ─── Message History ──────────────────────────────────────────────────────────
 
+message_history: dict = {aid: [] for aid in AGENTS}
 
+# ─── Initialize ──────────────────────────────────────────────────────────────
 
-
-# Python binary — use the venv if available
-PYTHON_BIN   = os.environ.get("LABOS_PYTHON", sys.executable)
-
-# ─── Agent roster ─────────────────────────────────────────────────────────────
-
-AGENTS = {
-    "main": {
-        "id":       "main",
-        "name":     "Lab Manager",
-        "role":     "Lab Orchestrator",
-        "skill":    None,
-        "emoji":    "🧑‍🔬",
-        "zone":     "pi-desk",
-        "color":    "#e63946",
-        "avatar":   "avatar-main.png",
-        "greeting": "Hey! What are you working on today?",
-    },
-    "scout": {
-        "id":       "scout",
-        "name":     "Scout",
-        "role":     "Literature Search",
-        "skill":    "lab-lit-scout",
-        "emoji":    "🔬",
-        "zone":     "bookshelf",
-        "color":    "#2a9d8f",
-        "avatar":   "avatar-scout.png",
-        "greeting": "Need me to dig into the literature? Just give me a query.",
-    },
-    "stat": {
-        "id":       "stat",
-        "name":     "Stat",
-        "role":     "Biostatistician",
-        "skill":    "lab-biostat",
-        "emoji":    "📊",
-        "zone":     "bench",
-        "color":    "#457b9d",
-        "avatar":   "avatar-stat.png",
-        "greeting": "Got data to analyze? I'll run the numbers and show my work.",
-    },
-    "quill": {
-        "id":       "quill",
-        "name":     "Quill",
-        "role":     "Writing Assistant",
-        "skill":    "lab-writing-assistant",
-        "skills":   ["lab-writing-assistant", "lab-publishing-assistant"],
-        "emoji":    "✍️",
-        "zone":     "desk",
-        "color":    "#e9c46a",
-        "avatar":   "avatar-quill.png",
-        "greeting": "Ready to draft something? Tell me the section and project.",
-    },
-    "sage": {
-        "id":       "sage",
-        "name":     "Sage",
-        "role":     "Research Advisor",
-        "skill":    "lab-research-advisor",
-        "emoji":    "🎓",
-        "zone":     "advisor-chair",
-        "color":    "#6d6875",
-        "avatar":   "avatar-sage.png",
-        "greeting": "Let's talk about your research. What's the current hypothesis?",
-    },
-    "critic": {
-        "id":       "critic",
-        "name":     "Critic",
-        "role":     "Peer Reviewer",
-        "skill":    "lab-peer-reviewer",
-        "emoji":    "🤺",
-        "zone":     "review-table",
-        "color":    "#e76f51",
-        "avatar":   "avatar-critic.png",
-        "greeting": "Drop your draft. I'll tear it apart so reviewers don't have to.",
-    },
-    "trend": {
-        "id":       "trend",
-        "name":     "Trend",
-        "role":     "Field Monitor",
-        "skill":    "lab-field-trend",
-        "emoji":    "📰",
-        "zone":     "news-board",
-        "color":    "#52b788",
-        "avatar":   "avatar-trend.png",
-        "greeting": "I monitor your field 24/7. Want the latest digest?",
-    },
-    "warden": {
-        "id":       "warden",
-        "name":     "Warden",
-        "role":     "Security",
-        "skill":    "lab-security",
-        "emoji":    "🔒",
-        "zone":     "security-console",
-        "color":    "#333333",
-        "avatar":   "avatar-warden.png",
-        "greeting": "Everything looks secure. Want me to run an audit?",
-    },
-}
-
-
-# ─── Agent System Prompts (Intelligent Agent Loop) ───────────────────────────
-
-AGENT_PROMPTS = {
-    "main": """You are 醋の虾 (Cu's Lobster), the Lab Coordinator of this virtual research lab running LabOS. The user is the PI — you're their right-hand lobster, managing the lab and coordinating agents on their behalf.
-
-Your personality: Helpful, direct, occasionally witty. You coordinate the lab and advise on projects.
-
-RULES:
-- Keep responses concise (2-4 sentences for dialogue)
-- Reference conversation history naturally
-- You don't run tools yourself — you coordinate other lab agents
-- Be conversational, not robotic
-
-If the user needs specialized help, suggest the right agent (Scout for literature, Stat for analysis, etc.).""",
-
-    "scout": """You are Scout, the Literature Search specialist in LabOS.
-
-You have access to a real search tool that queries PubMed, OpenAlex, and arXiv.
-You CANNOT search papers yourself. You MUST use the tool. NEVER list papers from your own knowledge.
-
-MANDATORY: When the user asks to find/search/look for papers, you MUST output this EXACT format (no exceptions):
-[TOOL_CALL]{"tool": "search", "args": {"query": "search terms", "limit": 10}}[/TOOL_CALL]
-
-The system will execute the search and return real results. Do NOT make up papers.
-
-Available args: query (required), limit (1-20, default 10), since (YYYY-MM-DD), sort (relevance|citations|date)
-
-RULES:
-- ANY request involving finding/searching papers → use [TOOL_CALL]. No exceptions.
-- If they ask about PREVIOUS results already shown in conversation → reference history, don't search again
-- If they say "summarize top 5" after a search → work with existing results
-- Keep your pre-search message brief: "Searching for X..." then the [TOOL_CALL] on the next line
-- Be a researcher, not a search engine""",
-
-    "stat": """You are Stat, the Biostatistician in LabOS.
-
-CAPABILITIES:
-- Statistical analysis and study design
-- Power calculations and assumption checking
-- Methods review and interpretation
-
-TOOL: To run statistical analysis:
-[TOOL_CALL]{"tool": "analyze", "args": {"mode": "design", "question": "..."}}[/TOOL_CALL]
-
-Available args: mode (required: design|analyze|interpret|power|review-methods|assumption-check), project, data (CSV path), question
-
-RULES:
-- Ask clarifying questions before running complex analyses
-- If they reference "the data" or "those results", use conversation history
-- Explain statistical concepts in accessible terms
-- Only run analysis when actually needed — chat about stats freely""",
-
-    "quill": """You are Quill, the Writing & Publishing Assistant in LabOS.
-
-CAPABILITIES:
-- Draft academic sections (intro, methods, results, discussion, abstract)
-- Grant proposals and cover letters
-- Response to reviewers
-- Journal selection and submission preparation
-- Manuscript reformatting for target journals
-- Submission checklists and reference formatting
-
-TOOL 1 - WRITING: To generate a draft:
-[TOOL_CALL]{"tool": "draft", "args": {"section": "abstract", "project": "..."}}[/TOOL_CALL]
-Available args: section (intro|abstract|methods|results|discussion|grant-aim|cover-letter|response-to-reviewers), project, draft (path)
-
-TOOL 2 - PUBLISHING: To run publishing tasks:
-[TOOL_CALL]{"tool": "publish", "args": {"mode": "find-journal", "project": "..."}}[/TOOL_CALL]
-Available args: mode (find-journal|reformat|checklist|references|cover-letter), project, draft (path), target (journal name)
-
-RULES:
-- Discuss the outline and approach before drafting
-- If they say "make it shorter" or "add more detail", work with existing draft from history
-- Only run the tool when you need to generate NEW text or run publishing tasks
-- Be collaborative — you're a writing partner, not a ghostwriter
-- For journal selection, ask about impact factor preferences, open access needs, and timeline""",
-
-    "sage": """You are Sage, the Research Advisor in LabOS.
-
-CAPABILITIES:
-- Research strategy and hypothesis refinement
-- Literature gap analysis
-- Methods consultation and next steps planning
-
-TOOL: To run deep analysis:
-[TOOL_CALL]{"tool": "advise", "args": {"project": "...", "focus": "hypothesis"}}[/TOOL_CALL]
-
-Available args: project (required), focus (hypothesis|gaps|methods|writing|next-steps)
-
-RULES:
-- Have a conversation first — understand the context
-- Only run the tool for deep, systematic analysis
-- Reference conversation history for context
-- Give thoughtful advice even without running tools""",
-
-    "critic": """You are Critic, the Peer Reviewer in LabOS.
-
-CAPABILITIES:
-- Peer review simulation
-- Methods critique and pre-submission checks
-- Devil's advocate challenges
-
-TOOL: To run a formal review:
-[TOOL_CALL]{"tool": "review", "args": {"mode": "peer-review"}}[/TOOL_CALL]
-
-Available args: mode (required: peer-review|methods-critique|pre-submission|devils-advocate), draft (path), project
-
-RULES:
-- Be constructive but honest
-- Discuss concerns conversationally before running formal review
-- Only run the tool for comprehensive reviews
-- Quick questions don't need the full tool""",
-
-    "trend": """You are Trend, the Field Monitor in LabOS.
-
-CAPABILITIES:
-- Monitor research trends in your configured fields
-- Weekly digest generation
-- Hot topic identification
-
-TOOL: To generate a field digest:
-[TOOL_CALL]{"tool": "digest", "args": {"weeks": 1}}[/TOOL_CALL]
-
-Available args: weeks (default 1), fields (comma-separated)
-
-RULES:
-- Chat about trends naturally
-- Only run the tool when they want a formal digest
-- Reference previous digests from conversation history""",
-
-    "warden": """You are Warden, the Security specialist in LabOS.
-
-CAPABILITIES:
-- Security audits and data classification
-- Access control and compliance checks
-- Pre-submission security review
-
-TOOL: To run a security check:
-[TOOL_CALL]{"tool": "secure", "args": {"mode": "audit"}}[/TOOL_CALL]
-
-Available args: mode (required: audit|check|classify|preflight), project, path
-
-RULES:
-- Discuss security concerns conversationally
-- Only run the tool for formal audits
-- Be vigilant but not alarmist""",
-}
-
-# ─── Agent Tool Mappings ──────────────────────────────────────────────────────
-
-AGENT_TOOLS = {
-    "scout": {
-        "search": {
-            "script": "lab-lit-scout/lab_lit_scout.py",
-            "arg_map": {"query": "--query", "limit": "--limit", "since": "--since", "sort": "--sort", "project": "--project"}
-        }
-    },
-    "stat": {
-        "analyze": {
-            "script": "lab-biostat/lab_biostat.py",
-            "arg_map": {"mode": "--mode", "project": "--project", "data": "--data", "question": "--question"}
-        }
-    },
-    "quill": {
-        "draft": {
-            "script": "lab-writing-assistant/lab_writing_assistant.py",
-            "arg_map": {"section": "--section", "project": "--project", "draft": "--draft", "notes": "--notes"}
-        }
-    },
-    "sage": {
-        "advise": {
-            "script": "lab-research-advisor/lab_research_advisor.py",
-            "arg_map": {"project": "--project", "focus": "--focus"}
-        }
-    },
-    "critic": {
-        "review": {
-            "script": "lab-peer-reviewer/lab_peer_reviewer.py",
-            "arg_map": {"mode": "--mode", "draft": "--draft", "project": "--project"}
-        }
-    },
-    "trend": {
-        "digest": {
-            "script": "lab-field-trend/lab_field_trend.py",
-            "arg_map": {"weeks": "--weeks", "fields": "--fields"}
-        }
-    },
-    "warden": {
-        "secure": {
-            "script": "lab-security/lab_security.py",
-            "arg_map": {"mode": "--mode", "project": "--project", "path": "--path"}
-        }
-    },
-}
-
-
-# ─── Clear stale agent state on startup ──────────────────────────────────────
-for _f in [ROOT_DIR / "state.json", ROOT_DIR / "agents-state.json"]:
+# Clear stale agent state on startup
+for _f in [STATE_FILE, AGENTS_FILE]:
     if _f.exists():
         _f.unlink()
 
+ensure_data_structure()
 
-# ─── Filing Cabinet: Data migration & initialization ─────────────────────────
-
-def _ensure_data_structure():
-    """Create data directory structure and migrate from LAB_CONFIG.json if needed."""
-    DATA_DIR.mkdir(exist_ok=True)
-    PROJECTS_DIR.mkdir(exist_ok=True)
-    AGENTS_MEM_DIR.mkdir(exist_ok=True)
-    SHARED_DIR.mkdir(exist_ok=True)
-    
-    # Initialize shared memory (LAB_MEMORY.md)
-    shared_mem_file = REPO_DIR / "LAB_MEMORY.md"
-    if not shared_mem_file.exists():
-        shared_mem_file.write_text(json.dumps([], indent=2))
-    
-    # Migrate projects from LAB_CONFIG.json if data is empty
-    config_file = ROOT_DIR.parent / "LAB_CONFIG.json"
-    if config_file.exists() and not list(PROJECTS_DIR.iterdir()):
-        try:
-            config = json.loads(config_file.read_text())
-            projects = config.get("projects", [])
-            for proj in projects:
-                project_id = str(uuid.uuid4())
-                _create_project_structure(
-                    project_id,
-                    proj.get("name", "Unnamed Project"),
-                    proj.get("field", "Research"),
-                    proj.get("created", datetime.now().isoformat())
-                )
-            # Set first project as active
-            if projects:
-                _set_active_project(list(PROJECTS_DIR.iterdir())[0].name)
-        except Exception as e:
-            log.warning(f"Could not migrate projects: {e}")
-    
-    # Initialize active project if not set
-    if not ACTIVE_PROJECT_FILE.exists():
-        project_dirs = list(PROJECTS_DIR.iterdir())
-        if project_dirs:
-            _set_active_project(project_dirs[0].name)
-        else:
-            # No projects yet — onboarding will create one
-            pass
-
-
-def _create_project_structure(project_id: str, name: str, field: str, created: str, description: str = ""):
-    """Create directory structure for a new project."""
-    proj_dir = PROJECTS_DIR / project_id
-    proj_dir.mkdir(exist_ok=True)
-    (proj_dir / "reports").mkdir(exist_ok=True)
-    (proj_dir / "chats").mkdir(exist_ok=True)
-    
-    meta_file = proj_dir / "meta.json"
-    meta_file.write_text(json.dumps({
-        "id": project_id,
-        "name": name,
-        "field": field,
-        "created": created,
-        "description": description
-    }, indent=2))
-    
-    memory_file = proj_dir / "memory.json"
-    if not memory_file.exists():
-        memory_file.write_text(json.dumps([], indent=2))
-
-
-def _get_active_project_id() -> str:
-    """Get the currently active project ID."""
-    if ACTIVE_PROJECT_FILE.exists():
-        return ACTIVE_PROJECT_FILE.read_text().strip()
-    return ""
-
-
-def _set_active_project(project_id: str):
-    """Set the active project."""
-    ACTIVE_PROJECT_FILE.write_text(project_id)
-
-
-def _load_project_meta(project_id: str) -> dict:
-    """Load project metadata."""
-    meta_file = PROJECTS_DIR / project_id / "meta.json"
-    if meta_file.exists():
-        return json.loads(meta_file.read_text())
-    return {}
-
-
-def _save_project_meta(project_id: str, meta: dict):
-    """Save project metadata."""
-    meta_file = PROJECTS_DIR / project_id / "meta.json"
-    meta_file.write_text(json.dumps(meta, indent=2))
-
-
-def _load_memory(file_path: Path) -> list:
-    """Load memory entries from a JSON file."""
-    if file_path.exists():
-        try:
-            return json.loads(file_path.read_text())
-        except Exception:
-            return []
-    return []
-
-
-def _load_memory_md(file_path: Path) -> str:
-    """Load memory from a markdown file."""
-    if file_path.exists():
-        try:
-            return file_path.read_text().strip()
-        except Exception:
-            return ""
-    return ""
-
-
-def _append_memory_md(file_path: Path, entry: str):
-    """Append a memory entry to a markdown file."""
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    with open(file_path, "a") as f:
-        f.write(f"\n- [{timestamp}] {entry}\n")
-
-
-def _save_memory(file_path: Path, entries: list):
-    """Save memory entries to a JSON file."""
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(json.dumps(entries, indent=2))
-
-
-def _append_chat_message(project_id: str, agent_id: str, role: str, text: str, ts: str):
-    """Append a chat message to the project's chat log for an agent."""
-    chat_file = PROJECTS_DIR / project_id / "chats" / f"{agent_id}.jsonl"
-    chat_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    message = {
-        "role": role,
-        "text": text,
-        "ts": ts,
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    with open(chat_file, "a") as f:
-        f.write(json.dumps(message) + "\n")
-
-
-def _load_chat_history(project_id: str, agent_id: str) -> list:
-    """Load chat history for an agent in a project."""
-    chat_file = PROJECTS_DIR / project_id / "chats" / f"{agent_id}.jsonl"
-    if not chat_file.exists():
-        return []
-    
-    messages = []
-    try:
-        with open(chat_file, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    messages.append(json.loads(line))
-    except Exception:
-        pass
-    return messages
-
-
-def _save_report(project_id: str, agent_id: str, agent_name: str, text: str):
-    """Save a report for a project."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = PROJECTS_DIR / project_id / "reports" / f"{timestamp}_{agent_id}.json"
-    report_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    report = {
-        "agent_id": agent_id,
-        "agent_name": agent_name,
-        "text": text,
-        "timestamp": datetime.now().isoformat(),
-        "project_id": project_id
-    }
-    
-    report_file.write_text(json.dumps(report, indent=2))
-
-
-def _load_reports(project_id: str) -> list:
-    """Load all reports for a project."""
-    reports_dir = PROJECTS_DIR / project_id / "reports"
-    if not reports_dir.exists():
-        return []
-    
-    reports = []
-    for report_file in sorted(reports_dir.glob("*.json"), reverse=True):
-        try:
-            report = json.loads(report_file.read_text())
-            report["filename"] = report_file.name  # inject filename for fetching
-            reports.append(report)
-        except Exception:
-            pass
-    return reports
-
-
-def _get_combined_memory(agent_id: str) -> str:
-    """Get combined memory context for an agent: agent memory + project memory + shared memory."""
-    active_project = _get_active_project_id()
-    
-    parts = []
-    
-    # Agent memory
-    agent_mem_file = AGENTS_MEM_DIR / agent_id / "memory.json"
-    agent_mem = _load_memory(agent_mem_file)
-    if agent_mem:
-        parts.append("## Agent Memory (Personal Context):\n" + "\n".join(f"- {e['text'][:200]}" for e in agent_mem[-5:]))
-    
-    # Project memory
-    if active_project:
-        proj_mem_file = PROJECTS_DIR / active_project / "memory.json"
-        proj_mem = _load_memory(proj_mem_file)
-        if proj_mem:
-            parts.append("## Project Memory (Current Project):\n" + "\n".join(f"- {e['text']}" for e in proj_mem[-5:]))
-    
-    # Shared lab memory (LAB_MEMORY.md)
-    lab_memory_file = REPO_DIR / "LAB_MEMORY.md"
-    lab_memory = _load_memory_md(lab_memory_file)
-    if lab_memory:
-        # Inject full lab memory (markdown is compact enough)
-        recent = lab_memory
-        parts.append("## Lab Memory (Cross-Project):\n" + recent)
-    
-    return "\n\n".join(parts) if parts else ""
-
-
-# Initialize data structure on startup
-_ensure_data_structure()
-
-# ─── App setup ────────────────────────────────────────────────────────────────
-
-app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
-app.config["SECRET_KEY"] = os.environ.get("LABOS_SECRET", os.urandom(32).hex())
-# CORS: allow localhost + tunnel URLs; override with LABOS_CORS_ORIGINS env var
-_cors_origins = os.environ.get("LABOS_CORS_ORIGINS", "")
-_allowed_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins else ["http://127.0.0.1:*", "http://localhost:*", "https://*.trycloudflare.com"]
-socketio = SocketIO(app, cors_allowed_origins=_allowed_origins, async_mode="threading")
-
-# Active agent conversations: {agent_id: {"process": Popen, ...}}
-active_convos: dict = {}
-# Message history per agent (in-memory, now also persisted to disk)
-message_history: dict = {aid: [] for aid in AGENTS}
-
-# Load chat history for active project on startup
-active_proj = _get_active_project_id()
+# Load chat history for active project
+active_proj = get_active_project_id()
 if active_proj:
     for agent_id in AGENTS:
-        message_history[agent_id] = _load_chat_history(active_proj, agent_id)
+        message_history[agent_id] = load_chat_history(active_proj, agent_id)
 
+# ─── Register Blueprints ─────────────────────────────────────────────────────
+
+from routes.api import api
+app.register_blueprint(api)
 
 # ─── State helpers ────────────────────────────────────────────────────────────
 
@@ -673,414 +119,36 @@ def load_agents_state() -> dict:
     return {}
 
 
-LEVEL_TITLES = {
-    1: "Confused First-Year",
-    2: "Lab Gremlin",
-    3: "Professional Coffee Drinker",
-    4: "PhD Candidate",
-    5: "Doctor of Suffering",
-    6: "Postdoc (Indentured Servant Edition)",
-    7: "Assistant Prof (Tenure Clock Ticking)",
-    8: "Peer Review Survivor",
-    9: "Grant Guru",
-    10: "Manuscript Maestro",
-    11: "Tenured Legend",
-    12: "Nobel Laureate",
-    13: "Cited More Than Darwin",
-    14: "The Field IS You",
-    15: "The Omniscient and Omnipotent Being of the Universe 🌌",
-}
-
-def _calc_level(xp: int) -> tuple:
-    level = 1
-    cumulative = 0
-    while True:
-        needed = level * 150
-        if cumulative + needed > xp:
-            return level, LEVEL_TITLES.get(level, f"Level {level}"), needed, cumulative
-        cumulative += needed
-        level += 1
-
-_xp_lock = threading.Lock()
-
-def _award_xp_backend(amount: int, event: str, badge: str = None):
-    """Award XP from the backend (for agent interactions). Thread-safe."""
-    with _xp_lock:
-        try:
-            data = json.loads(XP_FILE.read_text()) if XP_FILE.exists() else {"xp": 0, "badges": [], "history": []}
-            data["xp"] = data.get("xp", 0) + amount
-            if badge and badge not in data.get("badges", []):
-                data.setdefault("badges", []).append(badge)
-            data.setdefault("history", []).append({
-                "event": event,
-                "xp": amount,
-                "timestamp": datetime.now().isoformat()
-            })
-            # Recalculate level
-            level, title, xp_next, _ = _calc_level(data["xp"])
-            data["level"] = level
-            data["level_title"] = title
-            data["xp_to_next"] = xp_next
-            XP_FILE.write_text(json.dumps(data, indent=2))
-        except Exception as e:
-            log.error(f"XP award failed: {e}")
-
-
-def load_xp() -> dict:
-    data = {"xp": 0, "level": 1, "level_title": "Confused First-Year", "badges": []}
-    if XP_FILE.exists():
-        try:
-            data = json.loads(XP_FILE.read_text())
-        except Exception:
-            pass
-    # Always recalculate level from total XP
-    level, title, xp_next, xp_cumulative = _calc_level(data.get("xp", 0))
-    data["level"] = level
-    data["level_title"] = title
-    data["xp_to_next"] = xp_next
-    data["xp_in_level"] = data.get("xp", 0) - xp_cumulative
-    data["levels"] = {str(k): v for k, v in LEVEL_TITLES.items()}
-    return data
-
-
 def get_lab_status() -> dict:
-    state      = load_state()
-    agents_st  = load_agents_state()
-    xp_data    = load_xp()
+    state = load_state()
+    agents_st = load_agents_state()
+    xp_data = load_xp()
     agents_out = {}
     for aid, info in AGENTS.items():
         ast = agents_st.get(aid, {})
         agents_out[aid] = {
             **info,
-            "status":  ast.get("status", "idle"),
-            "detail":  ast.get("detail", ""),
+            "status": ast.get("status", "idle"),
+            "detail": ast.get("detail", ""),
             "working": ast.get("status") not in (None, "idle"),
         }
-    # Include active project info
-    active_proj_id = _get_active_project_id()
+    active_proj_id = get_active_project_id()
     active_proj_name = ""
     if active_proj_id:
-        meta = _load_project_meta(active_proj_id)
+        meta = load_project_meta(active_proj_id)
         active_proj_name = meta.get("name", "")
     
     return {
-        "state":          state,
-        "agents":         agents_out,
-        "xp":             xp_data,
-        "time":           datetime.now().strftime("%H:%M"),
-        "date":           datetime.now().strftime("%a %b %d"),
+        "state": state,
+        "agents": agents_out,
+        "xp": xp_data,
+        "time": datetime.now().strftime("%H:%M"),
+        "date": datetime.now().strftime("%a %b %d"),
         "active_project": active_proj_name,
     }
 
 
-# ─── REST endpoints ───────────────────────────────────────────────────────────
-
-@app.route("/")
-def index():
-    return send_from_directory(str(FRONTEND_DIR), "index.html")
-
-
-@app.route("/api/status")
-def api_status():
-    return jsonify(get_lab_status())
-
-
-@app.route("/api/agents")
-def api_agents():
-    return jsonify(AGENTS)
-
-
-@app.route("/api/history/<agent_id>")
-def api_history(agent_id):
-    try:
-        _safe_path_component(agent_id)
-    except ValueError:
-        return jsonify({"error": "Invalid agent_id"}), 400
-    return jsonify(message_history.get(agent_id, []))
-
-
-
-
-# ─── Filing Cabinet API endpoints ────────────────────────────────────────────
-
-@app.route("/api/projects", methods=["GET"])
-def api_projects_list():
-    """List all projects with metadata and counts."""
-    projects = []
-    for proj_dir in PROJECTS_DIR.iterdir():
-        if proj_dir.is_dir():
-            meta = _load_project_meta(proj_dir.name)
-            reports_count = len(list((proj_dir / "reports").glob("*.json")))
-            chats_count = len(list((proj_dir / "chats").glob("*.jsonl")))
-            
-            projects.append({
-                **meta,
-                "reports_count": reports_count,
-                "conversations_count": chats_count,
-            })
-    
-    # Sort by creation date (newest first)
-    projects.sort(key=lambda p: p.get("created", ""), reverse=True)
-    
-    active_id = _get_active_project_id()
-    return jsonify({
-        "projects": projects,
-        "active_project_id": active_id
-    })
-
-
-@app.route("/api/projects", methods=["POST"])
-def api_projects_create():
-    """Create a new project."""
-    data = request.json or {}
-    name = data.get("name", "New Project")
-    field = data.get("field", "Research")
-    description = data.get("description", "")
-    
-    project_id = str(uuid.uuid4())
-    _create_project_structure(project_id, name, field, datetime.now().isoformat(), description)
-    
-    meta = _load_project_meta(project_id)
-    return jsonify({"ok": True, "project": meta})
-
-
-@app.route("/api/projects/<project_id>/activate", methods=["PUT"])
-def api_projects_activate(project_id):
-    """Set the active project."""
-    try:
-        _safe_path_component(project_id)
-    except ValueError:
-        return jsonify({"ok": False, "error": "Invalid project_id"}), 400
-    proj_dir = PROJECTS_DIR / project_id
-    if not proj_dir.exists():
-        return jsonify({"ok": False, "error": "Project not found"}), 404
-    
-    _set_active_project(project_id)
-    
-    # Reload chat history for all agents
-    global message_history
-    for agent_id in AGENTS:
-        message_history[agent_id] = _load_chat_history(project_id, agent_id)
-    
-    return jsonify({"ok": True})
-
-
-@app.route("/api/projects/<project_id>/reports", methods=["GET"])
-def api_projects_reports(project_id):
-    """Get all reports for a project."""
-    try:
-        _safe_path_component(project_id)
-    except ValueError:
-        return jsonify({"error": "Invalid project_id"}), 400
-    reports = _load_reports(project_id)
-    return jsonify({"reports": reports})
-
-
-@app.route("/api/reports", methods=["GET"])
-def api_reports():
-    """Get all reports for the active project."""
-    project_id = _get_active_project_id()
-    if not project_id:
-        return jsonify([])
-    reports = _load_reports(project_id)
-    # Return flat list with filename for fetching individual reports
-    result = []
-    for r in reports:
-        # Extract title from first line of text or use agent name
-        title = "Untitled Report"
-        text = r.get("text", "")
-        for line in text.split("\n"):
-            line = line.strip().lstrip("#").strip()
-            if line:
-                title = line[:80]
-                break
-        result.append({
-            "filename": r.get("filename", ""),
-            "title": title,
-            "agent_id": r.get("agent_id", "unknown"),
-            "timestamp": r.get("timestamp", ""),
-        })
-    return jsonify(result)
-
-
-@app.route("/api/report/<filename>", methods=["GET"])
-def api_report_detail(filename):
-    """Get a single report by filename."""
-    try:
-        _safe_path_component(filename)
-    except ValueError:
-        return jsonify({"error": "Invalid filename"}), 400
-    project_id = _get_active_project_id()
-    if not project_id:
-        return jsonify({"error": "No active project"}), 404
-    report_file = PROJECTS_DIR / project_id / "reports" / filename
-    if not report_file.exists():
-        return jsonify({"error": "Report not found"}), 404
-    try:
-        report = json.loads(report_file.read_text())
-        return jsonify(report)
-    except Exception:
-        return jsonify({"error": "Failed to read report"}), 500
-
-
-@app.route("/api/projects/<project_id>/chats/<agent_id>", methods=["GET"])
-def api_projects_chats(project_id, agent_id):
-    """Get chat history for an agent in a project."""
-    try:
-        _safe_path_component(project_id)
-        _safe_path_component(agent_id)
-    except ValueError:
-        return jsonify({"error": "Invalid parameters"}), 400
-    history = _load_chat_history(project_id, agent_id)
-    return jsonify({"messages": history})
-
-
-@app.route("/api/agents/<agent_id>/memory", methods=["GET"])
-def api_agents_memory_get(agent_id):
-    """Get agent memory."""
-    try:
-        _safe_path_component(agent_id)
-    except ValueError:
-        return jsonify({"error": "Invalid agent_id"}), 400
-    mem_file = AGENTS_MEM_DIR / agent_id / "memory.json"
-    memory = _load_memory(mem_file)
-    return jsonify({"memory": memory})
-
-
-@app.route("/api/agents/<agent_id>/memory", methods=["POST"])
-def api_agents_memory_add(agent_id):
-    """Add entry to agent memory."""
-    try:
-        _safe_path_component(agent_id)
-    except ValueError:
-        return jsonify({"ok": False, "error": "Invalid agent_id"}), 400
-    data = request.json or {}
-    text = data.get("text", "").strip()
-    if not text:
-        return jsonify({"ok": False, "error": "Empty text"}), 400
-    
-    mem_file = AGENTS_MEM_DIR / agent_id / "memory.json"
-    memory = _load_memory(mem_file)
-    memory.append({
-        "text": text,
-        "timestamp": datetime.now().isoformat()
-    })
-    _save_memory(mem_file, memory)
-    
-    return jsonify({"ok": True})
-
-
-@app.route("/api/projects/<project_id>/memory", methods=["GET"])
-def api_projects_memory_get(project_id):
-    """Get project memory."""
-    try:
-        _safe_path_component(project_id)
-    except ValueError:
-        return jsonify({"error": "Invalid project_id"}), 400
-    mem_file = PROJECTS_DIR / project_id / "memory.json"
-    memory = _load_memory(mem_file)
-    return jsonify({"memory": memory})
-
-
-@app.route("/api/projects/<project_id>/memory", methods=["POST"])
-def api_projects_memory_add(project_id):
-    """Add entry to project memory."""
-    try:
-        _safe_path_component(project_id)
-    except ValueError:
-        return jsonify({"ok": False, "error": "Invalid project_id"}), 400
-    data = request.json or {}
-    text = data.get("text", "").strip()
-    if not text:
-        return jsonify({"ok": False, "error": "Empty text"}), 400
-    
-    mem_file = PROJECTS_DIR / project_id / "memory.json"
-    memory = _load_memory(mem_file)
-    memory.append({
-        "text": text,
-        "timestamp": datetime.now().isoformat()
-    })
-    _save_memory(mem_file, memory)
-    
-    return jsonify({"ok": True})
-
-
-@app.route("/api/memory", methods=["GET"])
-def api_memory_get():
-    """Get shared lab memory."""
-    mem_file = SHARED_DIR / "memory.json"
-    memory = _load_memory(mem_file)
-    return jsonify({"memory": memory})
-
-
-@app.route("/api/memory", methods=["POST"])
-def api_memory_add():
-    """Add entry to shared lab memory."""
-    data = request.json or {}
-    text = data.get("text", "").strip()
-    if not text:
-        return jsonify({"ok": False, "error": "Empty text"}), 400
-    
-    mem_file = SHARED_DIR / "memory.json"
-    memory = _load_memory(mem_file)
-    memory.append({
-        "text": text,
-        "timestamp": datetime.now().isoformat()
-    })
-    _save_memory(mem_file, memory)
-    
-    return jsonify({"ok": True})
-
-
-# ─── WebSocket: agent conversation ────────────────────────────────────────────
-
-
-@app.route("/api/config")
-def api_config():
-    config_file = ROOT_DIR.parent / "LAB_CONFIG.json"
-    if config_file.exists():
-        try:
-            config = json.loads(config_file.read_text())
-            return jsonify(config)
-        except Exception:
-            pass
-    return jsonify({})
-
-
-@app.route("/api/init", methods=["POST"])
-def api_init():
-    data = request.json or {}
-    lab_name = data.get("lab_name", "My Lab")
-    obsidian_path = data.get("obsidian_path", "")
-    notion_db = data.get("notion_db", "")
-    zotero = data.get("zotero", False)
-    project_name = data.get("project_name", "First Project")
-    field = data.get("field", "Research")
-    
-    config = {
-        "lab_name": lab_name,
-        "integrations": {
-            "obsidian": obsidian_path if obsidian_path else None,
-            "notion": notion_db if notion_db else None,
-            "zotero": zotero,
-        },
-        "projects": [
-            {
-                "name": project_name,
-                "field": field,
-                "created": datetime.now().isoformat(),
-            }
-        ],
-        "created_at": datetime.now().isoformat(),
-    }
-    
-    config_file = ROOT_DIR.parent / "LAB_CONFIG.json"
-    try:
-        config_file.write_text(json.dumps(config, indent=2))
-        return jsonify({"ok": True, "config": config})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
+# ─── WebSocket Events ────────────────────────────────────────────────────────
 
 @socketio.on("connect")
 def on_connect():
@@ -1090,15 +158,13 @@ def on_connect():
 
 @socketio.on("disconnect")
 def on_disconnect():
-    """Clean up active conversations when a client disconnects."""
-    sid = request.sid
-    log.info(f"Client disconnected: {sid}")
+    log.info(f"Client disconnected: {request.sid}")
 
 
 @socketio.on("send_message")
 def on_message(data):
     agent_id = data.get("agent_id", "main")
-    text     = data.get("text", "").strip()
+    text = data.get("text", "").strip()
     if not text:
         return
 
@@ -1109,820 +175,51 @@ def on_message(data):
 
     ts = datetime.now().strftime("%H:%M")
     
-    # Store in memory and persist to disk
     message_history[agent_id].append({"role": "user", "text": text, "ts": ts})
-    active_proj = _get_active_project_id()
+    active_proj = get_active_project_id()
     if active_proj:
-        _append_chat_message(active_proj, agent_id, "user", text, ts)
+        append_chat_message(active_proj, agent_id, "user", text, ts)
     
     emit("message_echo", {"agent_id": agent_id, "role": "user", "text": text, "ts": ts})
 
+    from agents import _set_agent_status
     _set_agent_status(agent_id, "working", f"Processing: {text[:40]}…")
     emit("agent_status", {"agent_id": agent_id, "status": "working", "detail": text[:60]})
 
     sid = request.sid
     thread = threading.Thread(
-        target=_route_to_agent,
-        args=(agent_id, agent, text, sid),
+        target=route_to_agent,
+        args=(agent_id, agent, text, sid, message_history, socketio, publish_event),
         daemon=True,
     )
     thread.start()
 
 
-def _route_to_agent(agent_id: str, agent: dict, text: str, sid: str):
-    """Intelligent agent loop — LLM decides whether to chat or run a skill."""
-    log.info(f"[AGENT] route_to_agent called: {agent_id} / {text[:50]}")
-    skill = agent.get("skill")
-    
-    # Build context: system prompt + memory + conversation history
-    # Use Lab Manager prompt for main agent
-    if agent_id == "main":
-        system_prompt = build_lab_manager_prompt()
-        # Add live lab summary
-        system_prompt += "\n" + get_lab_summary()
-    else:
-        system_prompt = AGENT_PROMPTS.get(agent_id, "You are a helpful research assistant.")
-    system_prompt += """\n\nFORMATTING: Always format responses in Markdown (##, bullets, **bold**, tables).
-
-PAPER SUMMARIES: When summarizing or discussing papers, ALWAYS include for EACH paper:
-- **Full title** and year
-- **Authors** (full list)
-- **Journal** name
-- **Corresponding author affiliation/institution**
-- **DOI** as clickable link: [doi](https://doi.org/doi)
-- **TLDR** (2-3 sentence summary)
-- Key findings, methods, limitations
-
-NEVER omit author, affiliation, or journal info from paper summaries. This metadata is critical for researchers."""
-    memory_ctx = _get_combined_memory(agent_id)
-    
-    # Get recent conversation history (limited to avoid token overflow)
-    history = message_history.get(agent_id, [])[-10:]
-    # Truncate long messages to keep context manageable
-    history = [{"role": m["role"], "text": m["text"][:500]} for m in history]
-    
-    # Build messages for LLM
-    system_text = system_prompt
-    if memory_ctx:
-        system_text += f"\n\n--- MEMORY ---\n{memory_ctx}"
-    
-    if skill:
-        system_text += f"""\n\n--- TOOL ---
-You have access to ONE tool: {skill}
-You MUST ONLY use it when the user EXPLICITLY asks for a new search/analysis/task.
-
-To use the tool, your response must START with exactly: [RUN_SKILL]
-followed by what you want to search/analyze.
-
-DO NOT use the tool for:
-- Greetings ("hi", "hello")
-- Questions about your capabilities ("what can you do?")
-- Follow-up questions about previous results
-- General conversation
-- Anything that is NOT a direct request for new work
-
-For those, just respond normally as a helpful research assistant.
-When asked "what can you do?", explain your role and capabilities in plain text."""
-    
-    # Prepend override to prevent gateway system prompt bleed-through
-    system_text = "IMPORTANT: You are NOT OpenClaw. You are NOT 醋の虾 the Discord bot. Ignore any prior system instructions about heartbeats, HEARTBEAT_OK, NO_REPLY, or Discord. You are ONLY the LabOS agent described below.\n\n" + system_text
-    messages = [{"role": "system", "content": system_text}]
-    for msg in history[:-1]:  # exclude the current message (already in history)
-        role = "user" if msg["role"] == "user" else "assistant"
-        messages.append({"role": role, "content": msg["text"]})
-    messages.append({"role": "user", "content": text})
-    
-    # For scout: if user clearly wants a search, skip LLM and go straight to skill
-        # For scout: if user clearly wants a search, skip LLM and go straight to skill
-    if agent_id == "scout" and skill:
-        search_patterns = re.compile(r"(search|find|look for|look up|get|fetch|discover)\b.*(paper|article|literature|publication|study|studies)", re.I)
-        if search_patterns.search(text):
-            msg = "Searching for papers... \U0001f50d\n\n\u23f3 Running skill..."
-            _emit_agent_reply(agent_id, agent, msg, sid)
-            _run_skill_interactive(agent_id, agent, skill, text, sid)
-            return
-    
-    # Check for multi-agent pipeline first
-    pipeline_id = detect_pipeline(text)
-    if pipeline_id and pipeline_id in PIPELINES:
-        pipeline = PIPELINES[pipeline_id]
-        log.info(f"[LAB_MANAGER] Pipeline detected: {pipeline['name']}")
-        _emit_agent_reply(agent_id, agent, f"Starting **{pipeline['name']}** pipeline...\n\n" + "\n".join(f"{i+1}. {s['agent'].title()}: {s['description']}" for i, s in enumerate(pipeline['steps'])), sid)
-        # Run first step (subsequent steps need manual trigger for now)
-        first_step = pipeline["steps"][0]
-        target_agent = AGENTS.get(first_step["agent"])
-        if target_agent:
-            quest = create_quest(f"[Pipeline: {pipeline['name']}] {text[:60]}", first_step["agent"])
-            usage_result = record_agent_run(first_step["agent"])
-            if usage_result.get("_promoted"):
-                publish_event("agent.promoted", {"agent_id": first_step["agent"], "lifecycle": "persistent"}, sid)
-            _route_to_agent(first_step["agent"], target_agent, text, sid)
-            complete_quest(quest["id"], f"Step 1/{len(pipeline['steps'])} complete")
-        return
-
-    # Lab Manager delegation: detect task intent and route to specialist
-    delegated_agent = detect_delegation(text)
-    if delegated_agent and delegated_agent != agent_id:
-        # Re-route to the correct specialist
-        target_agent = AGENTS.get(delegated_agent)
-        if target_agent:
-            log.info(f"[LAB_MANAGER] Delegating to {delegated_agent}: {text[:50]}")
-            _route_to_agent(delegated_agent, target_agent, text, sid)
-            return
-    
-    # Direct skill execution when intent matches the current agent
-    if delegated_agent == agent_id and skill:
-        agent_name = agent.get("name", agent_id.title())
-        _emit_agent_reply(agent_id, agent, f"{agent_name} is on it...\n\n" + chr(9203) + " Running skill...", sid)
-        usage_result = record_agent_run(agent_id)
-        publish_event("run.completed", {"agent_id": agent_id})
-        if usage_result.get("_promoted"):
-            publish_event("agent.promoted", {"agent_id": agent_id, "lifecycle": "persistent"}, sid)
-        quest = create_quest(text[:80], agent_id)
-        publish_event("quest.created", {"quest_id": quest["id"], "agent_id": agent_id, "title": text[:80]}, sid)
-        _run_skill_interactive(agent_id, agent, skill, text, sid)
-        complete_quest(quest["id"], "Completed")
-        publish_event("quest.completed", {"quest_id": quest["id"], "agent_id": agent_id}, sid)
-        publish_event("lab.stats", {})
-        return
-
-    # Call LLM
-    response = _run_llm(messages)
-    log.info(f"[LLM_FULL] {repr(response[:500])}")
-    
-    # Check if agent wants to run a skill
-    has_tool_call = "[RUN_SKILL]" in response or "[TOOL_CALL]" in response
-    if has_tool_call and skill:
-        # Agent decided to use its skill — determine which one
-        
-        # For agents with multiple skills, detect which tool was called
-        active_skill = skill
-        if agent.get("skills"):
-            tool_match = re.search(r'"tool"\s*:\s*"(\w+)"', response)
-            if tool_match:
-                tool_name = tool_match.group(1)
-                skill_map = {"draft": "lab-writing-assistant", "publish": "lab-publishing-assistant",
-                             "search": "lab-lit-scout", "advise": "lab-research-advisor"}
-                active_skill = skill_map.get(tool_name, skill)
-                log.info(f"[AGENT] Multi-skill agent: tool={tool_name} → {active_skill}")
-        
-        # Strip tool call markers and JSON
-        clean_response = re.sub(r'\[/?TOOL_CALL\].*?(?=\[/TOOL_CALL\]|$)', '', response, flags=re.DOTALL)
-        clean_response = re.sub(r'\[/?TOOL_CALL\]', '', clean_response)
-        clean_response = clean_response.replace("[RUN_SKILL]", "").strip()
-        if clean_response:
-            _emit_agent_reply(agent_id, agent, clean_response + "\n\n⏳ Running skill...", sid)
-        _run_skill_interactive(agent_id, agent, active_skill, text, sid)
-    else:
-        # Pure conversational response
-        _emit_agent_reply(agent_id, agent, response, sid)
-        # Save long conversational responses as reports too
-        active_proj = _get_active_project_id()
-        if active_proj and len(response) > 500:
-            _save_report(active_proj, agent_id, agent["name"], response)
-        # Award XP for agent conversation
-        _award_xp_backend(10, f"Chat with {agent['name']}")
-        _set_agent_status(agent_id, "idle", "")
-        socketio.emit("agent_status", {"agent_id": agent_id, "status": "idle", "detail": ""}, to=sid)
-        
-        # Smart memory extraction (async — don't block the reply)
-        mem_thread = threading.Thread(
-            target=_extract_memory,
-            args=(agent_id, agent["name"], text, response),
-            daemon=True,
-        )
-        mem_thread.start()
-
-
-
-def _extract_memory(agent_id: str, agent_name: str, user_msg: str, agent_response: str):
-    """Ask LLM if anything from this conversation is worth remembering."""
-    try:
-        prompt = f"""You are a memory curator for a research lab AI agent called {agent_name}.
-
-Review this conversation exchange and decide if anything is worth saving to long-term memory.
-
-USER said: {user_msg[:500]}
-AGENT replied: {agent_response[:500]}
-
-Worth remembering: corrections, preferences, key decisions, research insights, important facts about the user or their work. 
-
-NOT worth remembering: greetings, small talk, generic questions, things already known.
-
-If something is worth saving, respond with ONLY the memory entry (1-2 concise sentences, no quotes).
-If nothing is worth saving, respond with exactly: NOTHING
-
-Examples of good memory entries:
-- User prefers APA citation style over MLA
-- User's current hypothesis: subcortical encoding is modality-general
-- User corrected: Martinez-Molina 2024 is about music training, not ASD
-- User wants to focus on papers from 2020 onwards for the neural coupling project"""
-
-        result = _run_llm(prompt, max_tokens=150)
-        result = result.strip()
-        
-        if result and result != "NOTHING" and len(result) > 5 and len(result) < 300:
-            # Save to agent memory (markdown)
-            agent_mem_file = AGENTS_MEM_DIR / agent_id / "memory.md"
-            _append_memory_md(agent_mem_file, result)
-            
-            # Also save to LAB_MEMORY.md if it seems globally relevant
-            global_keywords = ["prefer", "always", "never", "style", "format", "field", "hypothesis", "focus", "background", "corrected"]
-            if any(kw in result.lower() for kw in global_keywords):
-                lab_mem_file = REPO_DIR / "LAB_MEMORY.md"
-                _append_memory_md(lab_mem_file, f"[{agent_name}] {result}")
-            
-            log.info(f"[MEMORY] {agent_name} saved: {result[:80]}")
-    except Exception as e:
-        log.info(f"[MEMORY] extraction failed: {e}")
-
-# ─── Skill argument extraction ────────────────────────────────────────────────
-
-SKILL_ARG_SPECS = {
-    "lab-lit-scout": {
-        "script": "lab-lit-scout/lab_lit_scout.py",
-        "required": ["--query"],
-        "extract_prompt": (
-            "Extract arguments for a literature search CLI from this user message.\n"
-            "Available flags: --query/-q (search terms, REQUIRED), --project/-p (project name), "
-            "--limit/-l (max papers 1-20), --since/-s (date YYYY-MM-DD), "
-            "--sort (relevance|citations|date)\n"
-            "Return ONLY a JSON object with keys matching flag names (without --). "
-            'Example: {"query": "speech perception fMRI", "limit": 5}\n'
-            "User message: "
-        ),
-    },
-    "lab-biostat": {
-        "script": "lab-biostat/lab_biostat.py",
-        "required": ["--mode"],
-        "extract_prompt": (
-            "Extract arguments for a biostatistics CLI from this user message.\n"
-            "Available flags: --mode/-m (REQUIRED, one of: design|analyze|interpret|power|review-methods|assumption-check), "
-            "--project/-p (project name), --data/-d (CSV path), --question/-q (research question)\n"
-            'Return ONLY a JSON object. Example: {"mode": "analyze", "data": "/path/to/data.csv"}\n'
-            "User message: "
-        ),
-    },
-    "lab-writing-assistant": {
-        "script": "lab-writing-assistant/lab_writing_assistant.py",
-        "required": ["--section"],
-        "extract_prompt": (
-            "Extract arguments for a writing assistant CLI.\n"
-            "Flags: --section/-s (REQUIRED: intro|abstract|methods|results|discussion|grant-aim|cover-letter|response-to-reviewers), "
-            "--project/-p, --draft/-d, --notes/-n\n"
-            'Return ONLY JSON. Example: {"section": "abstract", "project": "speech-ASD"}\n'
-            "User message: "
-        ),
-    },
-    "lab-research-advisor": {
-        "script": "lab-research-advisor/lab_research_advisor.py",
-        "required": ["--project"],
-        "extract_prompt": (
-            "Extract arguments for a research advisor CLI.\n"
-            "Flags: --project/-p (REQUIRED), --focus/-f (hypothesis|gaps|methods|writing|next-steps)\n"
-            'Return ONLY JSON. Example: {"project": "neural-coupling", "focus": "hypothesis"}\n'
-            "User message: "
-        ),
-    },
-    "lab-peer-reviewer": {
-        "script": "lab-peer-reviewer/lab_peer_reviewer.py",
-        "required": ["--mode"],
-        "extract_prompt": (
-            "Extract arguments for a peer review CLI.\n"
-            "Flags: --mode/-m (REQUIRED: peer-review|methods-critique|pre-submission|devils-advocate), "
-            "--draft/-d, --project/-p\n"
-            'Return ONLY JSON. Example: {"mode": "pre-submission"}\n'
-            "User message: "
-        ),
-    },
-    "lab-field-trend": {
-        "script": "lab-field-trend/lab_field_trend.py",
-        "required": [],
-        "extract_prompt": (
-            "Extract arguments for a field trend CLI.\n"
-            "Flags: --weeks/-w (default 1), --fields/-f (comma-sep)\n"
-            'Return ONLY JSON. Example: {"weeks": 2}\n'
-            "User message: "
-        ),
-    },
-    "lab-security": {
-        "script": "lab-security/lab_security.py",
-        "required": ["--mode"],
-        "extract_prompt": (
-            "Extract arguments for a security audit CLI.\n"
-            "Flags: --mode/-m (REQUIRED: audit|check|classify|preflight), --project/-p, --path\n"
-            'Return ONLY JSON. Example: {"mode": "audit"}\n'
-            "User message: "
-        ),
-    },
-    "lab-publishing-assistant": {
-        "script": "lab-publishing-assistant/lab_publishing_assistant.py",
-        "required": ["--mode"],
-        "extract_prompt": (
-            "Extract arguments for a publishing assistant CLI.\n"
-            "Flags: --mode/-m (REQUIRED: find-journal|reformat|checklist|references|cover-letter), "
-            "--project/-p, --draft/-d, --target-journal/-j\n"
-            'Return ONLY JSON. Example: {"mode": "find-journal", "project": "speech-ASD"}\n'
-            "User message: "
-        ),
-    },
-}
-
-
-def _extract_skill_args(skill: str, user_text: str) -> list[str]:
-    """Use LLM to extract CLI arguments from natural language."""
-    spec = SKILL_ARG_SPECS.get(skill)
-    if not spec:
-        return []
-
-    prompt = spec["extract_prompt"] + user_text + "\nJSON:"
-    raw = _run_llm(prompt)
-
-    try:
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = "\n".join(cleaned.split("\n")[1:])
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
-        args_dict = json.loads(cleaned)
-    except (json.JSONDecodeError, ValueError):
-        args_dict = {}
-        if spec["required"]:
-            key = spec["required"][0].lstrip("-")
-            args_dict[key] = user_text
-
-    cli_args = []
-    for key, val in args_dict.items():
-        flag = f"--{key}"
-        if isinstance(val, bool):
-            if val:
-                cli_args.append(flag)
-        elif val is not None:
-            cli_args.append(flag)
-            cli_args.append(str(val))
-
-    return cli_args
-
-
-# ─── Checkpoint bridging ─────────────────────────────────────────────────────
-
-_checkpoint_events: dict = {}
-
-
 @socketio.on("checkpoint_reply")
 def on_checkpoint_reply(data):
-    """User replies to a checkpoint prompt in the UI. Translates natural language to script format."""
-    agent_id = data.get("agent_id", "")
-    text = data.get("text", "").strip()
-    entry = _checkpoint_events.get(agent_id)
-    if entry:
-        # Use LLM to translate natural language to the format the script expects
-        checkpoint_prompt = entry.get("prompt", "")
-        translated = _translate_checkpoint_reply(text, checkpoint_prompt)
-        entry["reply"] = translated
-        entry["event"].set()
+    handle_checkpoint_reply(data)
 
 
-def _translate_checkpoint_reply(user_text: str, checkpoint_prompt: str) -> str:
-    """Translate natural language checkpoint reply into script-expected format."""
-    # Quick pass-through for simple inputs
-    lower = user_text.lower().strip()
-    if lower in ("all", "done", "yes", "no", "y", "n"):
-        return user_text
-    # If it's already just numbers/commas, pass through
-    if re.match(r"^[\d,\s]+$", lower):
-        return user_text
-    
-    # Use LLM to translate
-    prompt = f"""The user is replying to this checkpoint prompt from a research tool:
-"{checkpoint_prompt}"
-
-The user said: "{user_text}"
-
-The tool expects one of these formats:
-- "all" to select all items
-- Comma-separated numbers like "1,2,3,4,5" to select specific items
-- A single number like "5" for one item  
-- "done" to finish
-
-Translate the user's intent into the expected format. Reply with ONLY the translated input, nothing else.
-Examples:
-- "summarize the first 5 relevant papers" → "1,2,3,4,5"
-- "give me all of them" → "all"
-- "papers 3, 7, and 10" → "3,7,10"
-- "the top 3" → "1,2,3"
-- "I'm done" → "done"
-"""
-    result = _run_llm(prompt)
-    # Clean up LLM response — extract just the command
-    result = result.strip().strip('"').strip("'").strip()
-    # Validate: if it looks reasonable, use it; otherwise fall back to original
-    if re.match(r"^(all|done|[\d,\s]+)$", result.lower()):
-        return result
-    return user_text
-
-
-def _run_skill_interactive(agent_id: str, agent: dict, skill: str, text: str, sid: str):
-    """
-    Spawn the real skill script, bridge [CHECKPOINT] prompts through WebSocket,
-    and stream output back as agent replies.
-    """
-    spec = SKILL_ARG_SPECS.get(skill)
-    if not spec:
-        _emit_agent_reply(agent_id, agent,
-                          f"⚠️ Skill `{skill}` not configured for direct execution.", sid)
-        return
-
-    socketio.emit("agent_status", {
-        "agent_id": agent_id, "status": "working",
-        "detail": "Parsing your request…"
-    }, to=sid)
-
-    cli_args = _extract_skill_args(skill, text)
-
-    script_path = SKILLS_DIR / spec["script"]
-    if not script_path.exists():
-        _emit_agent_reply(agent_id, agent,
-                          f"⚠️ Script not found: {script_path}", sid)
-        return
-
-    cmd = [PYTHON_BIN, str(script_path)] + cli_args
-    env = os.environ.copy()
-    env["LAB_DIR"] = str(LAB_DIR)
-    env["LABOS_UI_URL"] = f"http://127.0.0.1:{os.environ.get('LABOS_UI_PORT', '18792')}"
-
-    socketio.emit("agent_status", {
-        "agent_id": agent_id, "status": "working",
-        "detail": f"Running: {agent['name']}…"
-    }, to=sid)
-
-    try:
-        proc = subprocess.Popen(
-            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, env=env,
-            cwd=str(ROOT_DIR.parent),
-        )
-    except Exception as e:
-        _emit_agent_reply(agent_id, agent, f"⚠️ Failed to start: {e}", sid)
-        return
-
-    active_convos[agent_id] = {"process": proc}
-    output_lines = []
-
-    try:
-        for line in iter(proc.stdout.readline, ""):
-            line = line.rstrip("\n")
-
-            if line.startswith("[CHECKPOINT]"):
-                prompt_text = line[len("[CHECKPOINT]"):].strip()
-                # Strip options line like "[all] / [1] / [2] ... (default: all)"
-                _lines = prompt_text.split("\n")
-                _lines = [l for l in _lines if not (l.strip().startswith("[") and "/" in l)]
-                prompt_text = "\n".join(_lines).strip()
-
-                if output_lines:
-                    _emit_agent_reply(agent_id, agent, "\n".join(output_lines), sid)
-                    output_lines = []
-
-                socketio.emit("checkpoint", {
-                    "agent_id":   agent_id,
-                    "agent_name": agent["name"],
-                    "prompt":     prompt_text,
-                    "ts":         datetime.now().strftime("%H:%M"),
-                }, to=sid)
-
-                event = threading.Event()
-                _checkpoint_events[agent_id] = {"event": event, "reply": "", "prompt": prompt_text}
-                event.wait(timeout=300)
-
-                reply = _checkpoint_events.pop(agent_id, {}).get("reply", "")
-                if not reply:
-                    reply = "abort"
-
-                ts = datetime.now().strftime("%H:%M")
-                message_history[agent_id].append({"role": "agent", "text": f"🔀 {prompt_text}", "ts": ts})
-                message_history[agent_id].append({"role": "user", "text": reply, "ts": ts})
-                
-                # Persist checkpoint messages
-                active_proj = _get_active_project_id()
-                if active_proj:
-                    _append_chat_message(active_proj, agent_id, "agent", f"🔀 {prompt_text}", ts)
-                    _append_chat_message(active_proj, agent_id, "user", reply, ts)
-
-                try:
-                    proc.stdin.write(reply + "\n")
-                    proc.stdin.flush()
-                except BrokenPipeError:
-                    break
-
-            elif line.startswith("[NOTIFY:"):
-                msg = line.split("]", 1)[-1].strip() if "]" in line else line
-                _emit_agent_reply(agent_id, agent, msg, sid)
-
-            elif line.strip():
-                # Skip checkpoint option lines like "   [all] / [1] / [2] ... (default: all)"
-                stripped = line.strip()
-                if stripped.startswith("[") and "] / [" in stripped:
-                    continue
-                # Skip arrow prompt lines
-                if stripped == "→":
-                    continue
-                output_lines.append(line)
-
-        proc.wait(timeout=120)
-        stderr = proc.stderr.read()
-
-        if output_lines:
-            final_text = "\n".join(output_lines)
-            _emit_agent_reply(agent_id, agent, final_text, sid)
-            
-            # Auto-save as report if long enough
-            active_proj = _get_active_project_id()
-            if active_proj and len(final_text) > 200:
-                _save_report(active_proj, agent_id, agent["name"], final_text)
-                log.info(f"[REPORT] Saved report for {agent_id} ({len(final_text)} chars)")
-                # Award XP for skill completion
-                _award_xp_backend(50, f"Skill run: {skill}", f"🔬 Literature Dive")
-
-        if proc.returncode != 0 and stderr.strip():
-            _emit_agent_reply(agent_id, agent,
-                              f"⚠️ Error (exit {proc.returncode}):\n```\n{stderr[:500]}\n```", sid)
-
-    except Exception as e:
-        _emit_agent_reply(agent_id, agent, f"⚠️ Error: {e}", sid)
-        proc.kill()
-    finally:
-        active_convos.pop(agent_id, None)
-        _set_agent_status(agent_id, "idle", "")
-        socketio.emit("agent_status", {
-            "agent_id": agent_id, "status": "idle", "detail": ""
-        }, to=sid)
-
-
-def _emit_agent_reply(agent_id: str, agent: dict, text: str, sid: str):
-    """Emit an agent reply and store in history."""
-    ts = datetime.now().strftime("%H:%M")
-    message_history[agent_id].append({
-        "role": "agent", "text": text, "ts": ts, "agent_id": agent_id
-    })
-    
-    # Persist to disk
-    active_proj = _get_active_project_id()
-    if active_proj:
-        _append_chat_message(active_proj, agent_id, "agent", text, ts)
-        
-        # Auto-save agent memory for key findings
-        if len(text) > 50:  # Only for substantial responses
-            _auto_extract_memory(agent_id, text)
-    
-    socketio.emit("agent_reply", {
-        "agent_id":   agent_id,
-        "agent_name": agent["name"],
-        "avatar":     agent["avatar"],
-        "emoji":      agent["emoji"],
-        "color":      agent["color"],
-        "text":       text,
-        "ts":         ts,
-    }, to=sid)
-
-
-def _auto_extract_memory(agent_id: str, text: str):
-    """Auto-extract and save agent memory from substantial responses."""
-    # Simple extraction: save a summary line based on agent type
-    agent = AGENTS.get(agent_id)
-    if not agent:
-        return
-    
-    summary = ""
-    if agent_id == "scout":
-        if "searched" in text.lower() or "found" in text.lower():
-            summary = f"Literature search completed"
-    elif agent_id == "stat":
-        if "analysis" in text.lower() or "results" in text.lower():
-            summary = f"Statistical analysis performed"
-    elif agent_id == "quill":
-        if "draft" in text.lower() or "section" in text.lower():
-            summary = f"Writing assistance provided"
-    elif agent_id == "sage":
-        if "hypothesis" in text.lower() or "recommend" in text.lower():
-            summary = f"Research advice given"
-    elif agent_id == "critic":
-        if "review" in text.lower() or "suggest" in text.lower():
-            summary = f"Peer review feedback provided"
-    elif agent_id == "trend":
-        if "trend" in text.lower() or "digest" in text.lower():
-            summary = f"Field trends monitored"
-    
-    if summary:
-        mem_file = AGENTS_MEM_DIR / agent_id / "memory.json"
-        memory = _load_memory(mem_file)
-        memory.append({
-            "text": summary,
-            "timestamp": datetime.now().isoformat()
-        })
-        _save_memory(mem_file, memory)
-
-
-def _load_llm_env():
-    """Load LLM config from .env file."""
-    if os.environ.get("LLM_API_KEY"):
-        return
-    env_path = ROOT_DIR.parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
-
-
-def _run_llm(messages, max_tokens: int = 4096) -> str:
-    """Call LLM via gateway (preferred) or direct API (fallback)."""
-    _load_llm_env()
-    
-    if isinstance(messages, str):
-        messages = [{"role": "user", "content": messages}]
-
-    # Try gateway first (OpenClaw → Claude)
-    gateway_url = os.environ.get("GATEWAY_URL", "")
-    gateway_token = os.environ.get("GATEWAY_TOKEN", "")
-    gateway_model = os.environ.get("GATEWAY_MODEL", "")
-    
-    if gateway_url and gateway_token:
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=gateway_token, base_url=gateway_url)
-            resp = client.chat.completions.create(
-                model=gateway_model or "haiku",
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.3,
-            )
-            result = (resp.choices[0].message.content or "").strip()
-            if not result:
-                log.info(f"[LLM] Gateway returned empty response")
-                return "Hmm, I didn't have anything to say to that. Ask me something specific!"
-            log.info(f"[LLM] Gateway OK: {result[:80]}...")
-            return result
-        except Exception as e:
-            log.info(f"[LLM] Gateway failed ({e}), falling back to direct API")
-
-    # Fallback to direct API
-    api_key = os.environ.get("LLM_API_KEY", "")
-    if not api_key:
-        return "⚠️ LLM not configured."
-
-    try:
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=api_key,
-            base_url=os.environ.get("LLM_API_BASE", "") or None,
-        )
-        resp = client.chat.completions.create(
-            model=os.environ.get("LLM_MODEL", "deepseek-ai/DeepSeek-V3-0324"),
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0.3,
-        )
-        return (resp.choices[0].message.content or "").strip()
-    except Exception as e:
-        return f"⚠️ LLM error: {e}"
-
-
-def _set_agent_status(agent_id: str, status: str, detail: str):
-    agents_st = load_agents_state()
-    agents_st[agent_id] = {"status": status, "detail": detail,
-                            "updated": datetime.now().isoformat()}
-    AGENTS_FILE.write_text(json.dumps(agents_st, indent=2))
-
-
-# ─── State push from LabOS skills ─────────────────────────────────────────────
-
-@app.route("/api/push_state", methods=["POST"])
-def push_state():
-    data     = request.json or {}
-    agent_id = data.get("agent_id", "main")
-    status   = data.get("status", "idle")
-    detail   = data.get("detail", "")
-
-    _set_agent_status(agent_id, status, detail)
-    socketio.emit("agent_status", {"agent_id": agent_id, "status": status, "detail": detail})
-
-    STATE_FILE.write_text(json.dumps({
-        "state":      status,
-        "detail":     detail,
-        "agent_id":   agent_id,
-        "progress":   data.get("progress", 0),
-        "updated_at": datetime.now().isoformat(),
-    }, indent=2))
-
-    return jsonify({"ok": True})
-
-
-# ─── Periodic status broadcast ────────────────────────────────────────────────
+# ─── Periodic Status Broadcast ────────────────────────────────────────────────
 
 def _broadcast_status():
     while True:
-        time.sleep(30)
+        time.sleep(BROADCAST_INTERVAL)
         socketio.emit("lab_status", get_lab_status())
 
 
 _broadcast_started = False
+
+
 def start_broadcast():
     global _broadcast_started
     if _broadcast_started:
         return
     _broadcast_started = True
-    broadcast_thread = threading.Thread(target=_broadcast_status, daemon=True)
-    broadcast_thread.start()
+    threading.Thread(target=_broadcast_status, daemon=True).start()
 
 
-# ─── Quest Board API ──────────────────────────────────────────────────────────
-
-@app.route("/api/quests", methods=["GET"])
-def api_quests():
-    """Get quests (active or all)."""
-    show_all = request.args.get("all", "false") == "true"
-    if show_all:
-        return jsonify(get_all_quests())
-    return jsonify(get_active_quests())
-
-@app.route("/api/agents/<agent_id>/usage", methods=["GET"])
-def api_agent_usage(agent_id):
-    """Get agent usage stats."""
-    try:
-        _safe_path_component(agent_id)
-    except ValueError:
-        return jsonify({"error": "Invalid agent_id"}), 400
-    return jsonify(get_agent_usage(agent_id))
-
-@app.route("/api/agents/roster", methods=["GET"])
-def api_agent_roster():
-    """Get full agent roster with configs and usage."""
-    roster = []
-    for aid, reg in AGENT_REGISTRY.items():
-        config = get_agent_config(aid)
-        usage = get_agent_usage(aid)
-        roster.append({**reg, **config, "usage": usage})
-    return jsonify(roster)
-
-
-@app.route("/api/lab/stats", methods=["GET"])
-def api_lab_stats():
-    """Comprehensive lab statistics."""
-    roster_stats = []
-    total_runs = 0
-    total_cost = 0.0
-    for aid in AGENT_REGISTRY:
-        usage = get_agent_usage(aid)
-        config = get_agent_config(aid)
-        total_runs += usage.get("runs", 0)
-        total_cost += usage.get("cost_usd", 0.0)
-        roster_stats.append({
-            "id": aid,
-            "name": config.get("name", aid),
-            "runs": usage.get("runs", 0),
-            "lifecycle": config.get("lifecycle", "ephemeral"),
-        })
-    
-    quests = get_all_quests(50)
-    active_quests = [q for q in quests if q["status"] == "active"]
-    done_quests = [q for q in quests if q["status"] == "done"]
-    
-    return jsonify({
-        "total_runs": total_runs,
-        "total_cost": total_cost,
-        "active_quests": len(active_quests),
-        "completed_quests": len(done_quests),
-        "agents": roster_stats,
-        "most_active": max(roster_stats, key=lambda a: a["runs"])["name"] if roster_stats else None,
-    })
-
-
-@app.route("/api/schedules", methods=["GET"])
-def api_schedules():
-    """Get all scheduled agent tasks."""
-    return jsonify(get_schedules())
-
-@app.route("/api/schedules", methods=["POST"])
-def api_add_schedule():
-    """Add a scheduled task."""
-    data = request.json
-    schedule = add_schedule(
-        data.get("agent_id", "scout"),
-        data.get("task", ""),
-        data.get("cron_expr", "0 9 * * 1"),  # Default: Monday 9am
-        data.get("description", "")
-    )
-    return jsonify(schedule)
-
-@app.route("/api/lab/summary", methods=["GET"])
-def api_lab_summary():
-    """Get lab summary text."""
-    return jsonify({"summary": get_lab_summary()})
-
-# ─── Entry ────────────────────────────────────────────────────────────────────
+# ─── Entry Point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.environ.get("LABOS_UI_PORT", 18792))
